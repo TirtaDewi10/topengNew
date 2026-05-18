@@ -96,6 +96,12 @@
             background-color: #f8fafc;
             padding-left: 22px;
         }
+        /* Style untuk Item Pencarian Aktif */
+        .search-result-item.active {
+            background-color: #eff6ff;
+            border-left: 4px solid #2563eb;
+            padding-left: 14px;
+        }
         .result-name {
             font-size: 13.5px;
             font-weight: 600;
@@ -235,7 +241,7 @@
                 padding: 6px 0;
             }
             .search-results-dropdown {
-                max-height: 220px;
+                max-height: 180px; /* Diperpendek sedikit di HP agar tidak menutupi balon popup di bawahnya */
                 border-radius: 12px;
             }
             .search-result-item {
@@ -243,6 +249,9 @@
             }
             .search-result-item:hover {
                 padding-left: 16px;
+            }
+            .search-result-item.active {
+                padding-left: 10px;
             }
             .result-name {
                 font-size: 12.5px;
@@ -470,20 +479,12 @@
             
             // Saring dan kumpulkan topeng yang cocok dengan kata kunci secara berurutan
             properties.masks.forEach(function(mask) {
-                if (targetMaskId) {
-                    // Mode fokus satu: Hanya tampilkan topeng yang dipilih dari saran dropdown
-                    if (mask.id_topeng === targetMaskId) {
-                        matchedMasks.push(mask);
-                    }
-                } else {
-                    // Mode pencarian/normal biasa
-                    var matches = !search ||
-                        mask.nama.toLowerCase().includes(search) ||
-                        properties.lokasi.toLowerCase().includes(search) ||
-                        mask.tahun.toString().toLowerCase().includes(search);
-                    if (matches) {
-                        matchedMasks.push(mask);
-                    }
+                var matches = !search ||
+                    mask.nama.toLowerCase().includes(search) ||
+                    properties.lokasi.toLowerCase().includes(search) ||
+                    mask.tahun.toString().toLowerCase().includes(search);
+                if (matches) {
+                    matchedMasks.push(mask);
                 }
             });
 
@@ -495,12 +496,7 @@
             var html = '<div class="popup-content">';
             html += '<div class="popup-title">';
             html += '  <span style="max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="' + properties.lokasi + '">' + properties.lokasi + '</span>';
-            
-            if (targetMaskId) {
-                html += '  <span class="popup-badge">Fokus Pencarian</span>';
-            } else {
-                html += '  <span class="popup-badge">' + matchedMasks.length + ' Topeng</span>';
-            }
+            html += '  <span class="popup-badge">' + matchedMasks.length + ' Topeng</span>';
             html += '</div>';
             html += '<div class="popup-scroll-container">';
 
@@ -509,11 +505,14 @@
                 var yearDisplay = highlightText(mask.tahun.toString(), searchTerm);
                 var descDisplay = highlightText(mask.deskripsi, searchTerm);
 
-                // Buka akordion jika dicari lewat keyword atau difokuskan dari dropdown
-                var isExpanded = (searchTerm || targetMaskId || mask.id_topeng === activeHighlightId) ? 'open' : '';
-                var highlightStyle = (mask.id_topeng === activeHighlightId || mask.id_topeng === targetMaskId) ? 'style="border: 2px solid #2563eb; background-color: #eff6ff;"' : '';
+                // Atur ekspansi details:
+                // Jika sedang difokuskan/diklik lewat dropdown list pencarian, buka details miliknya saja secara default
+                var isExpanded = (mask.id_topeng === activeHighlightId || (searchTerm && !activeHighlightId)) ? 'open' : '';
+                
+                // Tambahkan penanda style highlight khusus jika merupakan item aktif yang baru dipilih
+                var highlightStyle = (mask.id_topeng === activeHighlightId) ? 'style="border: 2px solid #2563eb; background-color: #eff6ff;"' : '';
 
-                html += '<details ' + isExpanded + ' ' + highlightStyle + '>';
+                html += '<details ' + isExpanded + ' ' + highlightStyle + ' data-id="' + mask.id_topeng + '">';
                 html += '  <summary>';
                 html += '    <span>' + nameDisplay + ' (' + yearDisplay + ')</span>';
                 html += '  </summary>';
@@ -531,16 +530,6 @@
             });
 
             html += '</div>'; // Tutup popup-scroll-container
-
-            // Jika dalam mode fokus satu topeng, tampilkan tombol untuk memulihkan daftar penuh
-            if (targetMaskId && properties.masks.length > 1) {
-                html += `<div style="margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 8px; text-align: center;">
-                    <button onclick="showAllMasksAt(${lat}, ${lng}, '${targetMaskId}')" style="background-color: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
-                         lihat ${properties.masks.length - 1} topeng lainnya di lokasi ini
-                    </button>
-                </div>`;
-            }
-
             html += '</div>'; // Tutup popup-content
             return html;
         }
@@ -570,7 +559,7 @@
                     var popupHtml = buildAccordionHtml(feature.properties, searchTerm);
                     if (popupHtml) {
                         layer.bindPopup(popupHtml, { 
-                            autoPanPaddingTopLeft: [15, 90], // Batas aman 90px agar tidak tertutup Search Bar
+                            autoPanPaddingTopLeft: [15, 120], // Ditambah batas aman menjadi 120px untuk mengantisipasi dropdown tetap terbuka
                             autoPanPaddingBottomRight: [15, 20],
                             className: 'responsive-popup'
                         });
@@ -583,50 +572,34 @@
             }
         }
 
-        // --- GLOBAL: MEMULIHKAN DAFTAR PENUH TOPENG ---
-        window.showAllMasksAt = function(lat, lng, activeMaskId) {
+        // --- GLOBAL: MEMILIH TOPENG DARI SARAN DROPDOWN ---
+        // Revisi: Pencarian tidak disetel ulang, dropdown tetap terbuka, popup detail langsung fokus dan scroll otomatis.
+        window.selectMask = function(maskId, lat, lng) {
+            selectedMaskId = maskId;
+            
+            // Tambahkan class .active pada item pencarian yang dipilih saat ini
+            const items = document.querySelectorAll('.search-result-item');
+            items.forEach(item => {
+                if (item.getAttribute('data-id') === maskId) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            
+            // Geser peta menuju marker tujuan
+            map.setView([lat, lng], 14);
+            
+            // Temukan layer marker yang bersangkutan dan buka popupnya secara fokus
             if (markerLayer) {
                 markerLayer.eachLayer(function(layer) {
                     var coords = layer.getLatLng();
                     if (Math.abs(coords.lat - lat) < 0.0001 && Math.abs(coords.lng - lng) < 0.0001) {
-                        var popupHtml = buildAccordionHtml(layer.feature.properties, "", null, activeMaskId);
+                        // Membangun ulang accordion HTML dengan highlight aktif
+                        var popupHtml = buildAccordionHtml(layer.feature.properties, searchInput.value, null, maskId);
                         if (popupHtml) {
                             layer.bindPopup(popupHtml, { 
-                                autoPanPaddingTopLeft: [15, 90],
-                                autoPanPaddingBottomRight: [15, 20],
-                                className: 'responsive-popup'
-                            }).openPopup();
-                        }
-                    }
-                });
-            }
-        };
-
-        // --- GLOBAL: MEMILIH TOPENG DARI SARAN DROPDOWN ---
-        window.selectMask = function(maskId, maskName, lat, lng) {
-            selectedMaskId = maskId;
-            
-            // Perbarui value input pencarian dengan nama topeng yang dipilih
-            searchInput.value = maskName;
-            clearBtn.style.display = 'flex';
-            
-            // Sembunyikan panel dropdown
-            document.getElementById('searchResults').style.display = 'none';
-            
-            // Filter peta khusus untuk marker tujuan
-            updateMarkers(maskName);
-            
-            // Temukan layer marker yang dituju dan buka popup mode terfokus
-            if (markerLayer) {
-                markerLayer.eachLayer(function(layer) {
-                    var props = layer.feature.properties;
-                    var hasMask = props.masks.some(m => m.id_tempeng === maskId || m.id_topeng === maskId);
-                    if (hasMask) {
-                        map.setView([lat, lng], 15);
-                        var popupHtml = buildAccordionHtml(props, "", maskId);
-                        if (popupHtml) {
-                            layer.bindPopup(popupHtml, { 
-                                autoPanPaddingTopLeft: [15, 90],
+                                autoPanPaddingTopLeft: [15, 120],
                                 autoPanPaddingBottomRight: [15, 20],
                                 className: 'responsive-popup'
                             }).openPopup();
@@ -684,10 +657,10 @@
                 var locHighlight = highlightText(m.lokasi, query);
                 var yearHighlight = highlightText(m.mask.tahun.toString(), query);
                 
-                // Escape string nama topeng agar aman ditaruh di parameter Javascript inline
-                var escapedName = m.mask.nama.replace(/'/g, "\\'");
+                // Beri penanda active jika item ini sedang difokuskan
+                var activeClass = (m.mask.id_topeng === selectedMaskId) ? 'active' : '';
                 
-                html += `<div class="search-result-item" onclick="selectMask('${m.mask.id_topeng}', '${escapedName}', ${m.lat}, ${m.lng})">
+                html += `<div class="search-result-item ${activeClass}" data-id="${m.mask.id_topeng}" onclick="selectMask('${m.mask.id_topeng}', ${m.lat}, ${m.lng})">
                     <div class="result-name">${nameHighlight} (${yearHighlight})</div>
                     <div class="result-meta">
                         <span>${locHighlight}</span>
@@ -711,11 +684,12 @@
 
         searchInput.addEventListener('input', function(e) {
             const val = e.target.value;
-            selectedMaskId = null; // Reset fokus jika pengguna mengetik manual kembali
+            selectedMaskId = null; // Reset fokus item jika pengguna mengubah teks input
             
             if (val.trim() !== "") {
                 clearBtn.style.display = 'flex';
                 showSuggestions(val);
+                updateMarkers(val);
             } else {
                 clearBtn.style.display = 'none';
                 searchResults.style.display = 'none';
@@ -724,12 +698,12 @@
         });
 
         searchInput.addEventListener('focus', function() {
-            if (searchInput.value.trim() !== "" && !selectedMaskId) {
+            if (searchInput.value.trim() !== "") {
                 showSuggestions(searchInput.value);
             }
         });
 
-        // Menutup dropdown otomatis ketika pengguna klik di luar bilah pencarian
+        // Menutup dropdown otomatis ketika pengguna klik di luar area search bar
         document.addEventListener('click', function(e) {
             var searchBar = document.getElementById('searchBar');
             if (!searchBar.contains(e.target)) {
@@ -747,7 +721,7 @@
             searchInput.focus();
         });
 
-        // Re-center posisi balon popup Leaflet agar selalu pas di layar saat accordion dibuka/ditutup
+        // Event listener saat popup Leaflet terbuka
         map.on('popupopen', function() {
             var details = document.querySelectorAll('details');
             details.forEach(function(detail) {
@@ -755,6 +729,16 @@
                     if (map._popup) map._popup.update();
                 });
             });
+
+            // Auto-scroll otomatis ke detail topeng yang dklik/dipilih
+            if (selectedMaskId) {
+                var highlightedDetail = document.querySelector(`details[data-id="${selectedMaskId}"]`);
+                if (highlightedDetail) {
+                    setTimeout(function() {
+                        highlightedDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }, 150);
+                }
+            }
         });
 
         // --- INTEGRASI & ENGINE DATABASE UTUH 300 BARIS ---
