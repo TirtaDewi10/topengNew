@@ -7,7 +7,7 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; overflow: hidden; }
         #map { width: 100%; height: 100vh; z-index: 1; }
         
         /* Search Bar UI - Responsif, Elegan & Modern */
@@ -115,7 +115,7 @@
             align-items: center;
         }
 
-        /* Popup Custom Responsive */
+        /* Popup Custom Responsive (Desktop Only) */
         .responsive-popup .leaflet-popup-content-wrapper {
             border-radius: 12px;
             padding: 4px;
@@ -123,7 +123,7 @@
         }
         .responsive-popup .leaflet-popup-content {
             margin: 12px 14px;
-            width: 340px !important; /* Lebar default yang pas untuk tablet dan laptop */
+            width: 340px !important; /* Lebar default yang pas untuk laptop */
             max-width: 100%;
         }
         .popup-title {
@@ -146,7 +146,7 @@
             font-weight: 600;
         }
 
-        /* Kontainer Scroll untuk kerapian di dalam balon popup */
+        /* Kontainer Scroll untuk kerapian di dalam balon popup/drawer */
         .popup-scroll-container {
             max-height: 320px; /* Batas tinggi ideal untuk laptop */
             overflow-y: auto;
@@ -154,18 +154,22 @@
         }
 
         /* Desain Scrollbar Minimalis */
-        .popup-scroll-container::-webkit-scrollbar {
+        .popup-scroll-container::-webkit-scrollbar,
+        .drawer-content::-webkit-scrollbar {
             width: 5px;
         }
-        .popup-scroll-container::-webkit-scrollbar-track {
+        .popup-scroll-container::-webkit-scrollbar-track,
+        .drawer-content::-webkit-scrollbar-track {
             background: #f8fafc;
             border-radius: 4px;
         }
-        .popup-scroll-container::-webkit-scrollbar-thumb {
+        .popup-scroll-container::-webkit-scrollbar-thumb,
+        .drawer-content::-webkit-scrollbar-thumb {
             background: #cbd5e1;
             border-radius: 4px;
         }
-        .popup-scroll-container::-webkit-scrollbar-thumb:hover {
+        .popup-scroll-container::-webkit-scrollbar-thumb:hover,
+        .drawer-content::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
 
@@ -229,19 +233,94 @@
             border: 1px solid #e2e8f0;
         }
 
-        /* MEDIA QUERIES: Penyesuaian Responsif untuk Perangkat Seluler (HP) */
-        @media (max-width: 480px) {
+        /* PREMIUM MOBILE BOTTOM DRAWER (Untuk Menghindari Overlap pada HP/Tablet) */
+        .bottom-drawer {
+            position: fixed;
+            bottom: -100%; /* Sembunyi secara default */
+            left: 0;
+            right: 0;
+            background: white;
+            z-index: 1500; /* Berada di atas kontrol Leaflet & Search bar */
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.15);
+            transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            max-height: 45vh; /* Menggunakan 45% dari tinggi layar maksimal */
+            display: flex;
+            flex-direction: column;
+        }
+        .bottom-drawer.open {
+            bottom: 0;
+        }
+        .drawer-handle {
+            width: 40px;
+            height: 4px;
+            background-color: #cbd5e1;
+            border-radius: 2px;
+            margin: 8px auto;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .drawer-header {
+            padding: 0 16px 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            flex-shrink: 0;
+        }
+        .drawer-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e293b;
+            max-width: 70%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .drawer-badge {
+            background-color: #eff6ff;
+            color: #2563eb;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        .drawer-close {
+            background: #f1f5f9;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #64748b;
+            transition: background 0.2s;
+        }
+        .drawer-close:hover {
+            background: #e2e8f0;
+        }
+        .drawer-content {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* MEDIA QUERIES: Penyesuaian HP */
+        @media (max-width: 768px) {
             .search-container {
                 top: 12px;
                 padding: 4px 12px;
-                width: 88%;
+                width: 90%;
             }
             .search-container input {
                 font-size: 13px;
                 padding: 6px 0;
             }
             .search-results-dropdown {
-                max-height: 180px; /* Diperpendek sedikit di HP agar tidak menutupi balon popup di bawahnya */
+                max-height: 180px; /* Dropdown diperpendek sedikit agar tidak mendominasi layar HP */
                 border-radius: 12px;
             }
             .search-result-item {
@@ -256,16 +335,6 @@
             .result-name {
                 font-size: 12.5px;
             }
-            .responsive-popup .leaflet-popup-content {
-                width: 275px !important; /* Popup menyusut agar pas di layar HP */
-                margin: 10px 10px;
-            }
-            .popup-scroll-container {
-                max-height: 240px; /* Area scroll lebih pendek agar tidak melebihi tinggi layar HP */
-            }
-            .popup-title {
-                font-size: 14px;
-            }
             summary {
                 padding: 8px 10px;
                 font-size: 12px;
@@ -277,12 +346,9 @@
         }
 
         /* Penyesuaian Tambahan untuk Tablet */
-        @media (min-width: 481px) and (max-width: 768px) {
+        @media (min-width: 769px) and (max-width: 1024px) {
             .search-container {
                 width: 75%;
-            }
-            .responsive-popup .leaflet-popup-content {
-                width: 310px !important;
             }
         }
     </style>
@@ -311,6 +377,24 @@
 
     <!-- Kontainer Peta -->
     <div id="map"></div>
+
+    <!-- Mobile Bottom Drawer -->
+    <div class="bottom-drawer" id="mobileDrawer">
+        <div class="drawer-handle"></div>
+        <div class="drawer-header">
+            <div class="drawer-title" id="drawerTitle">Nama Lokasi</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="drawer-badge" id="drawerBadge">0 Topeng</span>
+                <button class="drawer-close" id="drawerCloseBtn" title="Tutup">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="drawer-content" id="drawerContent"></div>
+    </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -441,7 +525,7 @@
                     },
                     properties: {
                         lokasi: group.lokasi,
-                        latitude: group.latitude,  // Koordinat di-inject ke properti agar mudah diakses
+                        latitude: group.latitude,
                         longitude: group.longitude,
                         masks: group.masks
                     }
@@ -472,13 +556,13 @@
             return text.toString().replace(regex, '<mark style="background-color: #ffeb3b; padding: 0 2px; border-radius: 2px; color: black; font-weight: inherit;">$1</mark>');
         }
 
-        // --- POPUP BERBASIS AKORDION DENGAN SISTEM FILTER DAN SCROLL ---
-        function buildAccordionHtml(properties, searchTerm, targetMaskId, activeHighlightId) {
+        // --- CORE HTML ACCORDION GENERATOR (Saring Otomatis Berdasarkan Search Term) ---
+        function buildAccordionHtmlInner(properties, searchTerm, activeHighlightId) {
             var search = searchTerm ? searchTerm.toLowerCase() : "";
             var matchedMasks = [];
             
-            // Saring dan kumpulkan topeng yang cocok dengan kata kunci secara berurutan
             properties.masks.forEach(function(mask) {
+                // Saring otomatis topeng yang cocok dengan kata kunci saja
                 var matches = !search ||
                     mask.nama.toLowerCase().includes(search) ||
                     properties.lokasi.toLowerCase().includes(search) ||
@@ -488,28 +572,16 @@
                 }
             });
 
-            if (matchedMasks.length === 0) return null;
+            if (matchedMasks.length === 0) return '';
 
-            var lat = properties.latitude;
-            var lng = properties.longitude;
-
-            var html = '<div class="popup-content">';
-            html += '<div class="popup-title">';
-            html += '  <span style="max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="' + properties.lokasi + '">' + properties.lokasi + '</span>';
-            html += '  <span class="popup-badge">' + matchedMasks.length + ' Topeng</span>';
-            html += '</div>';
-            html += '<div class="popup-scroll-container">';
-
+            var html = '';
             matchedMasks.forEach(function(mask) {
                 var nameDisplay = highlightText(mask.nama, searchTerm);
                 var yearDisplay = highlightText(mask.tahun.toString(), searchTerm);
                 var descDisplay = highlightText(mask.deskripsi, searchTerm);
 
-                // Atur ekspansi details:
-                // Jika sedang difokuskan/diklik lewat dropdown list pencarian, buka details miliknya saja secara default
+                // Otomatis buka accordion untuk topeng yang dipilih/aktif saat ini
                 var isExpanded = (mask.id_topeng === activeHighlightId || (searchTerm && !activeHighlightId)) ? 'open' : '';
-                
-                // Tambahkan penanda style highlight khusus jika merupakan item aktif yang baru dipilih
                 var highlightStyle = (mask.id_topeng === activeHighlightId) ? 'style="border: 2px solid #2563eb; background-color: #eff6ff;"' : '';
 
                 html += '<details ' + isExpanded + ' ' + highlightStyle + ' data-id="' + mask.id_topeng + '">';
@@ -529,9 +601,91 @@
                 html += '</details>';
             });
 
-            html += '</div>'; // Tutup popup-scroll-container
-            html += '</div>'; // Tutup popup-content
             return html;
+        }
+
+        // --- DESKTOP POPUP BUILDER ---
+        function buildAccordionHtml(properties, searchTerm, targetMaskId, activeHighlightId) {
+            var innerHtml = buildAccordionHtmlInner(properties, searchTerm, activeHighlightId);
+            if (!innerHtml) return null;
+
+            // Hitung total topeng yang lolos filter pencarian
+            var matchedCount = properties.masks.filter(function(mask) {
+                var search = searchTerm ? searchTerm.toLowerCase() : "";
+                return !search ||
+                    mask.nama.toLowerCase().includes(search) ||
+                    properties.lokasi.toLowerCase().includes(search) ||
+                    mask.tahun.toString().toLowerCase().includes(search);
+            }).length;
+
+            var html = '<div class="popup-content">';
+            html += '<div class="popup-title">';
+            html += '  <span style="max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="' + properties.lokasi + '">' + properties.lokasi + '</span>';
+            html += '  <span class="popup-badge">' + matchedCount + ' Topeng</span>';
+            html += '</div>';
+            html += '<div class="popup-scroll-container">';
+            html += innerHtml;
+            html += '</div>';
+            html += '</div>';
+            return html;
+        }
+
+        // --- SISTEM PEMILIHAN DESKTOP POPUP VS MOBILE DRAWER (ANTI-OVERLAP) ---
+        function showMaskDetails(layer, properties, searchTerm, activeHighlightId) {
+            // Deteksi jika pengguna membuka via ponsel/HP (lebar < 768px)
+            const isMobile = window.innerWidth <= 768;
+
+            // Hitung total topeng tersaring
+            var matchedCount = properties.masks.filter(function(mask) {
+                var search = searchTerm ? searchTerm.toLowerCase() : "";
+                return !search ||
+                    mask.nama.toLowerCase().includes(search) ||
+                    properties.lokasi.toLowerCase().includes(search) ||
+                    mask.tahun.toString().toLowerCase().includes(search);
+            }).length;
+
+            if (isMobile) {
+                // Di HP, tutup balon popup melayang agar tidak menutupi peta
+                map.closePopup();
+
+                const drawer = document.getElementById('mobileDrawer');
+                const drawerTitle = document.getElementById('drawerTitle');
+                const drawerBadge = document.getElementById('drawerBadge');
+                const drawerContent = document.getElementById('drawerContent');
+
+                drawerTitle.innerText = properties.lokasi;
+                drawerBadge.innerText = matchedCount + ' Topeng';
+
+                // Isi detail accordion tersaring ke dalam Bottom Drawer
+                const innerHtml = buildAccordionHtmlInner(properties, searchTerm, activeHighlightId);
+                drawerContent.innerHTML = innerHtml;
+
+                // Naikkan drawer dari bawah secara mulus
+                drawer.classList.add('open');
+
+                // Auto-scroll di HP ke topeng yang baru saja diklik
+                if (activeHighlightId) {
+                    setTimeout(function() {
+                        const highlightedDetail = drawerContent.querySelector(`details[data-id="${activeHighlightId}"]`);
+                        if (highlightedDetail) {
+                            highlightedDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    }, 150);
+                }
+            } else {
+                // Di Laptop/Komputer, tutup Mobile Drawer jika terbuka
+                document.getElementById('mobileDrawer').classList.remove('open');
+
+                // Tampilkan Popup Leaflet Standard di peta
+                var popupHtml = buildAccordionHtml(properties, searchTerm, null, activeHighlightId);
+                if (popupHtml) {
+                    layer.bindPopup(popupHtml, { 
+                        autoPanPaddingTopLeft: [15, 120], // Beri batas aman 120px dari atas agar popup tidak terhalang Search Container
+                        autoPanPaddingBottomRight: [15, 20],
+                        className: 'responsive-popup'
+                    }).openPopup();
+                }
+            }
         }
 
         // --- FILTER & PEMBARUAN MARKER ---
@@ -556,14 +710,11 @@
                     );
                 },
                 onEachFeature: function (feature, layer) {
-                    var popupHtml = buildAccordionHtml(feature.properties, searchTerm);
-                    if (popupHtml) {
-                        layer.bindPopup(popupHtml, { 
-                            autoPanPaddingTopLeft: [15, 120], // Ditambah batas aman menjadi 120px untuk mengantisipasi dropdown tetap terbuka
-                            autoPanPaddingBottomRight: [15, 20],
-                            className: 'responsive-popup'
-                        });
-                    }
+                    // Daftarkan event klik pada marker
+                    layer.on('click', function(e) {
+                        L.DomEvent.stopPropagation(e); // Cegah klik peta terpanggil
+                        showMaskDetails(layer, feature.properties, searchInput.value, null);
+                    });
                 }
             }).addTo(map);
 
@@ -573,11 +724,11 @@
         }
 
         // --- GLOBAL: MEMILIH TOPENG DARI SARAN DROPDOWN ---
-        // Revisi: Pencarian tidak disetel ulang, dropdown tetap terbuka, popup detail langsung fokus dan scroll otomatis.
+        // Pencarian tidak disetel ulang, dropdown hasil tetap bertahan terbuka, detail lurus fokus ke lokasi.
         window.selectMask = function(maskId, lat, lng) {
             selectedMaskId = maskId;
             
-            // Tambahkan class .active pada item pencarian yang dipilih saat ini
+            // Tambahkan class .active pada item pencarian yang dipilih saat ini di dropdown
             const items = document.querySelectorAll('.search-result-item');
             items.forEach(item => {
                 if (item.getAttribute('data-id') === maskId) {
@@ -587,23 +738,15 @@
                 }
             });
             
-            // Geser peta menuju marker tujuan
+            // Pindahkan peta secara mulus menuju marker target
             map.setView([lat, lng], 14);
             
-            // Temukan layer marker yang bersangkutan dan buka popupnya secara fokus
+            // Cari marker di peta dan luncurkan pop-up / drawer terfokus
             if (markerLayer) {
                 markerLayer.eachLayer(function(layer) {
                     var coords = layer.getLatLng();
                     if (Math.abs(coords.lat - lat) < 0.0001 && Math.abs(coords.lng - lng) < 0.0001) {
-                        // Membangun ulang accordion HTML dengan highlight aktif
-                        var popupHtml = buildAccordionHtml(layer.feature.properties, searchInput.value, null, maskId);
-                        if (popupHtml) {
-                            layer.bindPopup(popupHtml, { 
-                                autoPanPaddingTopLeft: [15, 120],
-                                autoPanPaddingBottomRight: [15, 20],
-                                className: 'responsive-popup'
-                            }).openPopup();
-                        }
+                        showMaskDetails(layer, layer.feature.properties, searchInput.value, maskId);
                     }
                 });
             }
@@ -647,7 +790,6 @@
                 return;
             }
             
-            // Batasi tampilan maksimal 50 saran agar rendering tetap super cepat
             var renderLimit = Math.min(matches.length, 50);
             var html = '';
             
@@ -657,7 +799,6 @@
                 var locHighlight = highlightText(m.lokasi, query);
                 var yearHighlight = highlightText(m.mask.tahun.toString(), query);
                 
-                // Beri penanda active jika item ini sedang difokuskan
                 var activeClass = (m.mask.id_topeng === selectedMaskId) ? 'active' : '';
                 
                 html += `<div class="search-result-item ${activeClass}" data-id="${m.mask.id_topeng}" onclick="selectMask('${m.mask.id_topeng}', ${m.lat}, ${m.lng})">
@@ -677,14 +818,16 @@
             dropdown.style.display = 'block';
         }
 
-        // --- PENANGANAN EVENT SEARCH ---
+        // --- EVENT BINDING ---
         const searchInput = document.getElementById('searchInput');
         const clearBtn = document.getElementById('clearBtn');
         const searchResults = document.getElementById('searchResults');
+        const mobileDrawer = document.getElementById('mobileDrawer');
+        const drawerCloseBtn = document.getElementById('drawerCloseBtn');
 
         searchInput.addEventListener('input', function(e) {
             const val = e.target.value;
-            selectedMaskId = null; // Reset fokus item jika pengguna mengubah teks input
+            selectedMaskId = null; // Lepaskan kunci id agar tidak memicu pemaksaan scroll
             
             if (val.trim() !== "") {
                 clearBtn.style.display = 'flex';
@@ -703,7 +846,7 @@
             }
         });
 
-        // Menutup dropdown otomatis ketika pengguna klik di luar area search bar
+        // Menutup saran dropdown otomatis ketika mengeklik di luar kotak pencarian
         document.addEventListener('click', function(e) {
             var searchBar = document.getElementById('searchBar');
             if (!searchBar.contains(e.target)) {
@@ -711,28 +854,40 @@
             }
         });
 
+        // Tombol bersihkan (silang) untuk menyetel ulang semua peta dan panel pencarian
         clearBtn.addEventListener('click', function() {
             searchInput.value = '';
             clearBtn.style.display = 'none';
             searchResults.style.display = 'none';
             selectedMaskId = null;
             map.closePopup();
+            mobileDrawer.classList.remove('open');
             updateMarkers('');
             searchInput.focus();
         });
 
-        // Event listener saat popup Leaflet terbuka
+        // Tombol penutup Drawer di layar ponsel
+        drawerCloseBtn.addEventListener('click', function() {
+            mobileDrawer.classList.remove('open');
+        });
+
+        // Event listener saat pengguna mengeklik area kosong di peta, tutup drawer/popup melayang
+        map.on('click', function() {
+            mobileDrawer.classList.remove('open');
+        });
+
+        // Re-center posisi balon popup Leaflet agar selalu dinamis saat detail akordion dibuka/ditutup
         map.on('popupopen', function() {
-            var details = document.querySelectorAll('details');
+            var details = document.querySelectorAll('.responsive-popup details');
             details.forEach(function(detail) {
                 detail.addEventListener('toggle', function() {
                     if (map._popup) map._popup.update();
                 });
             });
 
-            // Auto-scroll otomatis ke detail topeng yang dklik/dipilih
+            // Auto-scroll di balon popup Laptop saat dibuka lewat dropdown hasil
             if (selectedMaskId) {
-                var highlightedDetail = document.querySelector(`details[data-id="${selectedMaskId}"]`);
+                var highlightedDetail = document.querySelector(`.responsive-popup details[data-id="${selectedMaskId}"]`);
                 if (highlightedDetail) {
                     setTimeout(function() {
                         highlightedDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -772,7 +927,6 @@
         // --- SISTEM PEMUATAN DATA ---
         async function loadData() {
             try {
-                // Berjalan dinamis ketika berhasil membaca berkas di repositori utama GitHub Pages Anda
                 const response = await fetch('Data Topeng.csv');
                 if (response.ok) {
                     const csvText = await response.text();
