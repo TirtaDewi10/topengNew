@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peta Sebaran Topeng Bali (Search & Images)</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { width: 100%; height: 100vh; z-index: 1; }
+        
+        /* Search Bar UI */
+        .search-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            width: 80%;
+            max-width: 500px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .search-container input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            outline: none;
+            font-size: 14px;
+        }
+        .search-container input:focus { border-color: #2980b9; }
+
+        .csv-badge {
+            background-color: #e2e8f0;
+            color: #4a5568;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            border: 1px solid #cbd5e0;
+        }
+        .csv-badge:hover {
+            background-color: #cbd5e0;
+        }
+
+        /* Popup Accordion Styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            padding: 5px;
+        }
+        .leaflet-popup-content {
+            margin: 12px 14px;
+            width: 360px !important; /* Lebar popup konsisten */
+            max-width: 100%;
+        }
+        .popup-title {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 5px;
+        }
+
+        /* Kontainer Scroll untuk mencegah popup memanjang berantakan */
+        .popup-scroll-container {
+            max-height: 380px; /* Tinggi maksimal daftar topeng dalam popup */
+            overflow-y: auto;  /* Aktifkan scrolling vertikal */
+            padding-right: 6px;
+            margin-top: 5px;
+        }
+
+        /* Desain Scrollbar Kustom */
+        .popup-scroll-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .popup-scroll-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .popup-scroll-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .popup-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        details {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background-color: #f8fafc;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        details:hover {
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        summary {
+            padding: 10px;
+            font-weight: 600;
+            color: #1e293b;
+            cursor: pointer;
+            background-color: #f1f5f9;
+            outline: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::after {
+            content: '▼';
+            font-size: 10px;
+            color: #64748b;
+            transition: transform 0.2s;
+        }
+        details[open] summary::after {
+            transform: rotate(180deg);
+        }
+        details[open] summary {
+            border-bottom: 1px solid #e2e8f0;
+            background-color: #e2e8f0;
+        }
+        .accordion-content {
+            padding: 12px;
+            font-size: 13px;
+            color: #334155;
+            line-height: 1.5;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .mask-img {
+            width: 100%;
+            height: auto;
+            max-height: 180px;
+            object-fit: contain;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background-color: #f1f5f9;
+            border: 1px solid #cbd5e1;
+        }
+
+        /* Drag and Drop Overlay */
+        .upload-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            backdrop-filter: blur(5px);
+        }
+        .upload-card {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 2px dashed #3b82f6;
+            transition: all 0.3s;
+        }
+        .upload-card.dragover {
+            background: #0f172a;
+            border-color: #10b981;
+            transform: scale(1.02);
+        }
+        .upload-card h3 {
+            margin-top: 0;
+            color: #3b82f6;
+        }
+        .upload-card p {
+            font-size: 14px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+        .upload-btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.2s;
+        }
+        .upload-btn:hover {
+            background-color: #2563eb;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Kontrol Pencarian dan Update CSV -->
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Cari nama topeng, lokasi, atau tahun..." />
+        <div class="csv-badge" title="Unggah atau Perbarui File CSV Secara Manual" onclick="document.getElementById('csvFileInput').click()">
+            <span>📂 Perbarui CSV</span>
+        </div>
+        <input type="file" id="csvFileInput" accept=".csv" style="display: none;" />
+    </div>
+
+    <!-- Peta Utama -->
+    <div id="map"></div>
+
+    <!-- Dropzone Overlay jika ingin upload manual saat offline -->
+    <div id="uploadPrompt" class="upload-overlay">
+        <div class="upload-card" id="dropZone">
+            <div style="font-size: 48px; margin-bottom: 10px;">📂</div>
+            <h3>Perbarui Data Peta</h3>
+            <p>Silakan seret & lepas (drag & drop) file <strong>Data Topeng.csv</strong> ke sini, atau klik tombol di bawah untuk memilih file manual.</p>
+            <button class="upload-btn" onclick="document.getElementById('csvFileInput').click()">Pilih File CSV</button>
+            <button class="upload-btn" style="background-color: #4b5563; margin-top: 5px;" onclick="document.getElementById('uploadPrompt').style.display='none'">Batal</button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Inisialisasi peta Leaflet ke tengah Pulau Bali
+        var map = L.map('map').setView([-8.409518, 115.188919], 9);
+
+        // Menggunakan Tile layer CartoDB Voyager yang bersih dan modern
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // Custom Marker SVG Merah Presisi Tinggi
+        var customMarkerIcon = L.divIcon({
+            html: `<svg width="28" height="40" viewBox="0 0 30 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 0C6.71 0 0 6.71 0 15C0 26.25 15 42 15 42C15 42 30 26.25 30 15C30 6.71 23.29 0 15 0ZM15 20.5C11.96 20.5 9.5 18.04 9.5 15C9.5 11.96 11.96 9.5 15 9.5C18.04 9.5 20.5 11.96 20.5 15C20.5 18.04 18.04 20.5 15 20.5Z" fill="#e74c3c" stroke="#ffffff" stroke-width="2"/>
+                   </svg>`,
+            iconSize: [28, 40],
+            iconAnchor: [14, 40],
+            popupAnchor: [0, -38],
+            className: 'custom-marker'
+        });
+
+        var markerLayer = null;
+        var geojsonData = null;
+
+        // --- PARSER CSV ---
+        function parseCSV(text) {
+            const lines = [];
+            let row = [""];
+            let inQuotes = false;
+
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                const next = text[i+1];
+                if (c === '"') {
+                    if (inQuotes && next === '"') {
+                        row[row.length - 1] += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (c === ',' && !inQuotes) {
+                    row.push("");
+                } else if ((c === '\r' || c === '\n') && !inQuotes) {
+                    if (c === '\r' && next === '\n') { i++; }
+                    lines.push(row);
+                    row = [""];
+                } else {
+                    row[row.length - 1] += c;
+                }
+            }
+            if (row.length > 1 || row[0] !== "") {
+                lines.push(row);
+            }
+            return lines;
+        }
+
+        // --- MENGUBAH CSV KE GEOJSON (DENGAN CLUSTERING KOORDINAT SEJENIS) ---
+        function csvToGeoJSON(csvLines) {
+            if (csvLines.length < 2) return null;
+            const header = csvLines[0].map(h => h.trim().toLowerCase());
+            const dataRows = csvLines.slice(1);
+
+            const idIdx = header.indexOf('id_topeng');
+            const namaIdx = header.indexOf('nama_topeng');
+            const tahunIdx = header.indexOf('tahun');
+            const lokasiIdx = header.indexOf('lokasi');
+            const deskripsiIdx = header.indexOf('deskripsi');
+            const latIdx = header.indexOf('latitude');
+            const lngIdx = header.indexOf('longitude');
+            const imgIdx = header.indexOf('image');
+
+            if (latIdx === -1 || lngIdx === -1) {
+                console.error("Kolom koordinat tidak ditemukan.");
+                return null;
+            }
+
+            const locationGroups = {};
+
+            dataRows.forEach(row => {
+                if (row.length < Math.max(latIdx, lngIdx)) return;
+
+                const lat = parseFloat(row[latIdx]?.trim());
+                const lng = parseFloat(row[lngIdx]?.trim());
+                
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                const id = row[idIdx]?.trim() || '';
+                const nama = row[namaIdx]?.trim() || '';
+                const tahun = row[tahunIdx]?.trim() || '';
+                const lokasi = row[lokasiIdx]?.trim() || '';
+                const deskripsi = row[deskripsiIdx]?.trim() || '';
+                const gambar = row[imgIdx]?.trim() || '';
+
+                const key = `${lokasi}_${lat.toFixed(6)}_${lng.toFixed(6)}`;
+
+                if (!locationGroups[key]) {
+                    locationGroups[key] = {
+                        lokasi: lokasi,
+                        latitude: lat,
+                        longitude: lng,
+                        masks: []
+                    };
+                }
+
+                locationGroups[key].masks.push({
+                    id_topeng: id,
+                    nama: nama,
+                    tahun: tahun,
+                    deskripsi: deskripsi,
+                    gambar: gambar
+                });
+            });
+
+            const features = Object.values(locationGroups).map(group => {
+                return {
+                    type: "Feature",
+                    geometry: {
+                        type: "Point",
+                        coordinates: [group.longitude, group.latitude]
+                    },
+                    properties: {
+                        lokasi: group.lokasi,
+                        masks: group.masks
+                    }
+                };
+            });
+
+            return {
+                type: "FeatureCollection",
+                features: features
+            };
+        }
+
+        function processCSVData(csvText) {
+            const parsedLines = parseCSV(csvText);
+            const geojson = csvToGeoJSON(parsedLines);
+            if (geojson && geojson.features.length > 0) {
+                geojsonData = geojson;
+                updateMarkers();
+            } else {
+                console.error("CSV tidak valid atau kosong.");
+            }
+        }
+
+        function highlightText(text, search) {
+            if (!text || !search) return text || '';
+            const escapedSearch = search.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp('(' + escapedSearch + ')', 'gi');
+            return text.toString().replace(regex, '<mark style="background-color: #ffeb3b; padding: 0 2px; border-radius: 2px; color: black;">$1</mark>');
+        }
+
+        // --- RENDER POPUP SCROLLING DAN ACCORDION LIST ---
+        function buildAccordionHtml(properties, searchTerm) {
+            var search = searchTerm.toLowerCase();
+            var matchCount = 0;
+            
+            properties.masks.forEach(function(mask) {
+                var matches = !search ||
+                    mask.nama.toLowerCase().includes(search) ||
+                    properties.lokasi.toLowerCase().includes(search) ||
+                    mask.tahun.toString().toLowerCase().includes(search);
+                if (matches) matchCount++;
+            });
+
+            if (matchCount === 0) return null;
+
+            var html = '<div class="popup-content">';
+            html += '<div class="popup-title">' + properties.lokasi + ' (' + matchCount + ' Topeng)</div>';
+            html += '<div class="popup-scroll-container">';
+
+            properties.masks.forEach(function(mask) {
+                var matches = !search ||
+                    mask.nama.toLowerCase().includes(search) ||
+                    properties.lokasi.toLowerCase().includes(search) ||
+                    mask.tahun.toString().toLowerCase().includes(search);
+
+                if (matches) {
+                    var nameDisplay = highlightText(mask.nama, search);
+                    var yearDisplay = highlightText(mask.tahun.toString(), search);
+                    var descDisplay = highlightText(mask.deskripsi, search);
+
+                    html += '<details ' + (searchTerm ? 'open' : '') + '>';
+                    html += '  <summary>';
+                    html += '    <span>' + nameDisplay + ' (' + yearDisplay + ')</span>';
+                    html += '  </summary>';
+                    html += '  <div class="accordion-content">';
+                    if (mask.gambar) {
+                        // Terhubung ke folder images/ secara lokal maupun di web server GitHub Pages
+                        var imagePath = mask.gambar.startsWith('http') ? mask.gambar : 'images/' + mask.gambar;
+                        html += '    <div style="text-align: center;">';
+                        html += '      <img src="' + imagePath + '" class="mask-img" alt="' + mask.nama + '" onerror="this.onerror=null; this.src=\'https://placehold.co/150x150?text=' + encodeURIComponent(mask.id_topeng) + '\';">';
+                        html += '    </div>';
+                    }
+                    html += '    <p style="margin: 0 0 6px 0;"><strong>ID Topeng:</strong> ' + mask.id_topeng + '</p>';
+                    html += '    <p style="margin: 0; text-align: justify;">' + descDisplay + '</p>';
+                    html += '  </div>';
+                    html += '</details>';
+                }
+            });
+
+            html += '</div>';
+            html += '</div>';
+            return html;
+        }
+
+        function updateMarkers(searchTerm) {
+            searchTerm = searchTerm || "";
+            if (markerLayer) {
+                map.removeLayer(markerLayer);
+            }
+            if (!geojsonData) return;
+
+            markerLayer = L.geoJSON(geojsonData, {
+                pointToLayer: function (feature, latlng) {
+                    return L.marker(latlng, { icon: customMarkerIcon });
+                },
+                filter: function (feature) {
+                    var props = feature.properties;
+                    var search = searchTerm.toLowerCase();
+                    return props.masks.some(m => 
+                        m.nama.toLowerCase().includes(search) || 
+                        props.lokasi.toLowerCase().includes(search) || 
+                        m.tahun.toLowerCase().includes(search)
+                    );
+                },
+                onEachFeature: function (feature, layer) {
+                    var popupHtml = buildAccordionHtml(feature.properties, searchTerm);
+                    if (popupHtml) {
+                        layer.bindPopup(popupHtml, { autoPanPadding: [20, 20], minWidth: 360 });
+                    }
+                }
+            }).addTo(map);
+
+            if (searchTerm !== "" && markerLayer.getLayers().length > 0) {
+                map.fitBounds(markerLayer.getBounds(), { padding: [50, 50] });
+            }
+        }
+
+        // --- EVENT BINDING ---
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            updateMarkers(e.target.value);
+        });
+
+        map.on('popupopen', function() {
+            var details = document.querySelectorAll('details');
+            details.forEach(function(detail) {
+                detail.addEventListener('toggle', function() {
+                    if (map._popup) map._popup.update();
+                });
+            });
+        });
+
+        // --- LOGIKA DRAG & DROP DAN SELECT MANUAL ---
+        const uploadPrompt = document.getElementById('uploadPrompt');
+        const dropZone = document.getElementById('dropZone');
+        const csvFileInput = document.getElementById('csvFileInput');
+
+        window.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadPrompt.style.display = 'flex';
+            dropZone.classList.add('dragover');
+        });
+
+        window.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            if (geojsonData) {
+                uploadPrompt.style.display = 'none';
+            }
+            dropZone.classList.remove('dragover');
+        });
+
+        window.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        csvFileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.name.endsWith('.csv')) {
+                alert('Pilih file berformat .csv');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                processCSVData(e.target.result);
+                uploadPrompt.style.display = 'none';
+            };
+            reader.readAsText(file);
+        }
+
+        // --- SISTEM PEMUATAN DATA DUAL-MODE (UTAMA & CADANGAN) ---
+        async function loadInitialData() {
+            try {
+                // Di GitHub Pages, kodingan ini otomatis membaca file 'Data Topeng.csv' di repositori Anda
+                const response = await fetch('Data Topeng.csv');
+                if (response.ok) {
+                    const text = await response.text();
+                    processCSVData(text);
+                    console.log("Database peta berhasil dimuat secara otomatis dari Data Topeng.csv");
+                    return;
+                }
+            } catch (err) {
+                console.warn("Gagal memuat file CSV eksternal (mungkin karena dibuka offline). Menggunakan data cadangan bawaan.", err);
+            }
+            
+            // Pemuatan cadangan jika gagal fetch (misal dijalankan lokal offline dengan double click)
+            processCSVData(fallbackDatabaseCsv);
+        }
+
+        window.onload = function() {
+            loadInitialData();
+        };
+
+        // DATA CADANGAN LENGKAP 300 DATA UTK PENCEGAHAN OFFLINE PREVIEW
+        const fallbackDatabaseCsv = `no ,id_topeng ,nama_topeng,tahun ,lokasi ,deskripsi,latitude,longitude ,Image \r
+1,TP001,"Anggada, Hanggada",1930,"Museum Sonobudoyo, Yogyakarta","Despite the death of his father Subali at the hands of his uncle, Sugriwa, who succeeds him as the king of the monkeys, Anggada holds no grudge. Famed for his speed, Anggada was chosen as an emissary to the court of Rawana who scoffs at his demand to return Rama's kidnapped wife Sita. Violating diplomatic protocol, Rawana attempts to capture Anggada, who escapes using his magical powers. He would later prove his strength on the battlefield.",-7.802257,110.359438,TP001.jpg\r
+2,TP002,"Anikumba, Raksasa Anikumba, Son of Kumbakarna",1930,"Museum Bali, Denpasar","Anikumba and Akumba are the two sons of Rawana's youngest brother, the mighty Kumbakarna. As the tide of war turns against him, Rawana places Kumbakarna in charge of the demon army. Together with his sons, he leads his warriors onto to the battlefield. In the engagement, Anikumba is defeated by Anggada, the son of Subali, and his brother killed at the hands of Anoman, the white monkey hero and constant companion of Rama. This event shocks Rawana deeply, and he weeps with sadness at the demise of his nephews. It also causes him to realize that, as admonished by Kumbakarna, he made a great error by kidnapping Rama's wife Sita rather than first defeating him in battle. Like his father, Anikumba has a fearsome fanged face with bulbous eyes and an intensely fierce expression. He wears a single gold earring.",-8.657875,115.222384,TP002.jpg\r
+3,TP003,"Arjuna, Deva Panadi",1930,"Museum Bali, Denpasar","The third of the five Pandawa brothers, Arjuna is a consummate warrior who is as much famous for his prowess with the bow as he is for his refined character, good looks and many victories. In the Great Bharata War, the sight of his brothers and kinsfolk in battle array fills him with despair and remorse. His charioteer, Deva Krsna, reminds him of his ksatria warrior duty to defend justice.",-8.657875,115.222384,TP003.jpg\r
+4,TP004,"Arya Tegeh Kuri",1930,"Museum Bali, Denpasar","Tegeh Kuri, also known as Arya Kenceng, is the legendary founder of Tabanan Regency in southwestern Bali. Highly respected for his wisdom, power and spiritual insight, he was deified after his death. His descendants continue to pay respect to him as their ancestor.",-8.657875,115.222384,TP004.jpg\r
+5,TP005,"Arya Tegeh Kuri",1930,"Museum Bali, Denpasar","Tegeh Kuri, also known as Arya Kenceng, is the legendary founder of Tabanan Regency in southwestern Bali. Highly respected for his wisdom, power and spiritual insight, he was deified after his death. His descendants continue to pay respect to him as their ancestor.",-8.657875,115.222384,TP005.jpg\r
+6,TP006,Baris Buntal,1930,"Museum Bali, Denpasar","This dramatic white face with a tiny black moustache represents a baris buntal dancer. Based on an ancient ritual war dance, the name baris literally means 'line' or 'formation' and refers to the soldiers who defended the king. In this theatrical dance, the performer wears a large round crown adorned with hundreds of flowers, matching his brightly colored costume.",-8.657875,115.222384,TP006.jpg\r
+7,TP007,Baris Buntal,1930,"Museum Bali, Denpasar","This dramatic white face with a tiny black moustache represents a baris buntal dancer. Based on an ancient ritual war dance, the name baris literally means 'line' or 'formation' and refers to the soldiers who defended the king. In this theatrical dance, the performer wears a large round crown adorned with hundreds of flowers, matching his brightly colored costume.",-8.657875,115.222384,TP007.jpg\r
+8,TP008,Barong Asu,1930,"Museum Bali, Denpasar","This dramatic black canine face represents Barong Asu, the deified dog. Thought to have originated in Tabanan, southwest Bali, and Badung in the south, Barong Asu is a highly sacred object. He represents a primeval force of nature that protects the community against dark forces, evil spirits and deadly diseases.",-8.657875,115.222384,TP008.jpg\r
+9,TP009,Barong Landung Jauk,1930,"Museum Bali, Denpasar","Barong Landung refers to giant puppets, usually representing Jauk, a demonic forest dweller, and his wife, Jero Luh, who has Chinese-looking features. He is believed to protect the community from disaster.",-8.657875,115.222384,TP009.jpg\r
+10,TP010,Barong Landung Jero Luh,1930,"Museum Bali, Denpasar","Barong Landung Jero Luh is the Chinese-looking wife of the demonic forest dweller, Jauk. She is believed to protect the community from disaster.",-8.657875,115.222384,TP010.jpg\r
+11,TP011,Benda,1930,"Museum Bali, Denpasar","A dramatic white mask with a very large nose and black hair, representing a character in the traditional Calonarang drama.",-8.657875,115.222384,TP011.jpg\r
+12,TP012,Benda,1930,"Museum Bali, Denpasar","A dramatic white mask with a very large nose and black hair, representing a character in the traditional Calonarang drama.",-8.657875,115.222384,TP012.jpg\r
+13,TP013,Boma,1930,"Museum Bali, Denpasar","Boma, the son of Deva Visnu and Devi Pertiwi, the Earth Goddess, is a powerful guardian spirit. He is often depicted above temple gates to protect the inner sanctuary from evil spirits.",-8.657875,115.222384,TP013.jpg\r
+14,TP014,Buduh,1930,"Museum Bali, Denpasar","Buduh means 'crazy' or 'insane'. This mask represents a comic character in traditional Balinese theatre, characterized by his wild eyes and bizarre behavior.",-8.657875,115.222384,TP014.jpg\r
+15,TP015,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP015.jpg\r
+16,TP016,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP016.jpg\r
+17,TP017,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP017.jpg\r
+18,TP018,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP018.jpg\r
+19,TP019,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP019.jpg\r
+20,TP020,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP020.jpg\r
+21,TP021,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP021.jpg\r
+22,TP022,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP022.jpg\r
+23,TP023,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP023.jpg\r
+24,TP024,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP024.jpg\r
+25,TP025,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP025.jpg\r
+26,TP026,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP026.jpg\r
+27,TP027,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP027.jpg\r
+28,TP028,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP028.jpg\r
+29,TP029,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP029.jpg\r
+30,TP030,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP030.jpg\r
+31,TP031,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP031.jpg\r
+32,TP032,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP032.jpg\r
+33,TP033,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP033.jpg\r
+34,TP034,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP034.jpg\r
+35,TP035,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP035.jpg\r
+36,TP036,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP036.jpg\r
+37,TP037,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP037.jpg\r
+38,TP038,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP038.jpg\r
+39,TP039,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP039.jpg\r
+40,TP040,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP040.jpg\r
+41,TP041,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP041.jpg\r
+42,TP042,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP042.jpg\r
+43,TP043,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP043.jpg\r
+44,TP044,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP044.jpg\r
+45,TP045,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP045.jpg\r
+46,TP046,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP046.jpg\r
+47,TP047,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP047.jpg\r
+48,TP048,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP048.jpg\r
+49,TP049,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP049.jpg\r
+50,TP050,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP050.jpg\r
+51,TP051,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP051.jpg\r
+52,TP052,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP052.jpg\r
+53,TP053,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP053.jpg\r
+54,TP054,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP054.jpg\r
+55,TP055,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP055.jpg\r
+56,TP056,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP056.jpg\r
+57,TP057,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP057.jpg\r
+58,TP058,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP058.jpg\r
+59,TP059,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP059.jpg\r
+60,TP060,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP060.jpg\r
+61,TP061,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP061.jpg\r
+62,TP062,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP062.jpg\r
+63,TP063,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP063.jpg\r
+64,TP064,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP064.jpg\r
+65,TP065,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP065.jpg\r
+66,TP066,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP066.jpg\r
+67,TP067,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP067.jpg\r
+68,TP068,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP068.jpg\r
+69,TP069,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP069.jpg\r
+70,TP070,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP070.jpg\r
+71,TP071,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP071.jpg\r
+72,TP072,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP072.jpg\r
+73,TP073,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP073.jpg\r
+74,TP074,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP074.jpg\r
+75,TP075,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP075.jpg\r
+76,TP076,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP076.jpg\r
+77,TP077,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP077.jpg\r
+78,TP078,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP078.jpg\r
+79,TP079,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP079.jpg\r
+80,TP080,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP080.jpg\r
+81,TP081,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP081.jpg\r
+82,TP082,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP082.jpg\r
+83,TP083,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP083.jpg\r
+84,TP084,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP084.jpg\r
+85,TP085,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP085.jpg\r
+86,TP086,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP086.jpg\r
+87,TP087,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP087.jpg\r
+88,TP088,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP088.jpg\r
+89,TP089,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP089.jpg\r
+90,TP090,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP090.jpg\r
+91,TP091,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP091.jpg\r
+92,TP092,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP092.jpg\r
+93,TP093,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP093.jpg\r
+94,TP094,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP094.jpg\r
+95,TP095,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP095.jpg\r
+96,TP096,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP096.jpg\r
+97,TP097,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP097.jpg\r
+98,TP098,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP098.jpg\r
+99,TP099,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP099.jpg\r
+100,TP100,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP100.jpg\r
+101,TP101,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP101.jpg\r
+102,TP102,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP102.jpg\r
+103,TP103,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP103.jpg\r
+104,TP104,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP104.jpg\r
+105,TP105,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP105.jpg\r
+106,TP106,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP106.jpg\r
+107,TP107,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP107.jpg\r
+108,TP108,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP108.jpg\r
+109,TP109,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP109.jpg\r
+110,TP110,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP110.jpg\r
+111,TP111,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP111.jpg\r
+112,TP112,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP112.jpg\r
+113,TP113,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP113.jpg\r
+114,TP114,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP114.jpg\r
+115,TP115,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP115.jpg\r
+116,TP116,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP116.jpg\r
+117,TP117,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP117.jpg\r
+118,TP118,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP118.jpg\r
+119,TP119,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP119.jpg\r
+120,TP120,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP120.jpg\r
+121,TP121,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP121.jpg\r
+122,TP122,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP122.jpg\r
+123,TP123,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP123.jpg\r
+124,TP124,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP124.jpg\r
+125,TP125,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP125.jpg\r
+126,TP126,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP126.jpg\r
+127,TP127,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP127.jpg\r
+128,TP128,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP128.jpg\r
+129,TP129,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP129.jpg\r
+130,TP130,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP130.jpg\r
+131,TP131,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP131.jpg\r
+132,TP132,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP132.jpg\r
+133,TP133,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP133.jpg\r
+134,TP134,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP134.jpg\r
+135,TP135,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP135.jpg\r
+136,TP136,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP136.jpg\r
+137,TP137,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP137.jpg\r
+138,TP138,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP138.jpg\r
+139,TP139,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP139.jpg\r
+140,TP140,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP140.jpg\r
+141,TP141,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP141.jpg\r
+142,TP142,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP142.jpg\r
+143,TP143,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP143.jpg\r
+144,TP144,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP144.jpg\r
+145,TP145,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP145.jpg\r
+146,TP146,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP146.jpg\r
+147,TP147,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP147.jpg\r
+148,TP148,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP148.jpg\r
+149,TP149,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP149.jpg\r
+150,TP150,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP150.jpg\r
+151,TP151,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP151.jpg\r
+152,TP152,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP152.jpg\r
+153,TP153,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP153.jpg\r
+154,TP154,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP154.jpg\r
+155,TP155,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP155.jpg\r
+156,TP156,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP156.jpg\r
+157,TP157,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP157.jpg\r
+158,TP158,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP158.jpg\r
+159,TP159,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP159.jpg\r
+160,TP160,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP160.jpg\r
+161,TP161,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP161.jpg\r
+162,TP162,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP162.jpg\r
+163,TP163,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP163.jpg\r
+164,TP164,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP164.jpg\r
+165,TP165,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP165.jpg\r
+166,TP166,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP166.jpg\r
+167,TP167,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP167.jpg\r
+168,TP168,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP168.jpg\r
+169,TP169,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP169.jpg\r
+170,TP170,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP170.jpg\r
+171,TP171,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP171.jpg\r
+172,TP172,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP172.jpg\r
+173,TP173,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP173.jpg\r
+174,TP174,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP174.jpg\r
+175,TP175,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP175.jpg\r
+176,TP176,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP176.jpg\r
+177,TP177,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP177.jpg\r
+178,TP178,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP178.jpg\r
+179,TP179,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP179.jpg\r
+180,TP180,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP180.jpg\r
+181,TP181,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP181.jpg\r
+182,TP182,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP182.jpg\r
+183,TP183,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP183.jpg\r
+184,TP184,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP184.jpg\r
+185,TP185,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP185.jpg\r
+186,TP186,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP186.jpg\r
+187,TP187,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP187.jpg\r
+188,TP188,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP188.jpg\r
+189,TP189,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP189.jpg\r
+190,TP190,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP190.jpg\r
+191,TP191,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP191.jpg\r
+192,TP192,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP192.jpg\r
+193,TP193,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP193.jpg\r
+194,TP194,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP194.jpg\r
+195,TP195,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP195.jpg\r
+196,TP196,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP196.jpg\r
+197,TP197,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP197.jpg\r
+198,TP198,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP198.jpg\r
+199,TP199,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP199.jpg\r
+200,TP200,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP200.jpg\r
+201,TP201,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP201.jpg\r
+202,TP202,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP202.jpg\r
+203,TP203,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP203.jpg\r
+204,TP204,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP204.jpg\r
+205,TP205,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP205.jpg\r
+206,TP206,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP206.jpg\r
+207,TP207,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP207.jpg\r
+208,TP208,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP208.jpg\r
+209,TP209,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP209.jpg\r
+210,TP210,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP210.jpg\r
+211,TP211,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP211.jpg\r
+212,TP212,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP212.jpg\r
+213,TP213,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP213.jpg\r
+214,TP214,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP214.jpg\r
+215,TP215,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP215.jpg\r
+216,TP216,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP216.jpg\r
+217,TP217,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP217.jpg\r
+218,TP218,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP218.jpg\r
+219,TP219,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP219.jpg\r
+220,TP220,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP220.jpg\r
+221,TP221,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP221.jpg\r
+222,TP222,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP222.jpg\r
+223,TP223,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP223.jpg\r
+224,TP224,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP224.jpg\r
+225,TP225,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP225.jpg\r
+226,TP226,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP226.jpg\r
+227,TP227,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP227.jpg\r
+228,TP228,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP228.jpg\r
+229,TP229,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP229.jpg\r
+230,TP230,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP230.jpg\r
+231,TP231,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP231.jpg\r
+232,TP232,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP232.jpg\r
+233,TP233,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP233.jpg\r
+234,TP234,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP234.jpg\r
+235,TP235,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP235.jpg\r
+236,TP236,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP236.jpg\r
+237,TP237,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP237.jpg\r
+238,TP238,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP238.jpg\r
+239,TP239,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP239.jpg\r
+240,TP240,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP240.jpg\r
+241,TP241,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP241.jpg\r
+242,TP242,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP242.jpg\r
+243,TP243,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP243.jpg\r
+244,TP244,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP244.jpg\r
+245,TP245,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP245.jpg\r
+246,TP246,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP246.jpg\r
+247,TP247,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP247.jpg\r
+248,TP248,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP248.jpg\r
+249,TP249,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP249.jpg\r
+250,TP250,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP250.jpg\r
+251,TP251,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP251.jpg\r
+252,TP252,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP252.jpg\r
+253,TP253,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP253.jpg\r
+254,TP254,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP254.jpg\r
+255,TP255,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP255.jpg\r
+256,TP256,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP256.jpg\r
+257,TP257,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP257.jpg\r
+258,TP258,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP258.jpg\r
+259,TP259,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP259.jpg\r
+260,TP260,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP260.jpg\r
+261,TP261,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP261.jpg\r
+262,TP262,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP262.jpg\r
+263,TP263,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP263.jpg\r
+264,TP264,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP264.jpg\r
+265,TP265,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP265.jpg\r
+266,TP266,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP266.jpg\r
+267,TP267,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP267.jpg\r
+268,TP268,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP268.jpg\r
+269,TP269,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP269.jpg\r
+270,TP270,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP270.jpg\r
+271,TP271,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP271.jpg\r
+272,TP272,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP272.jpg\r
+273,TP273,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP273.jpg\r
+274,TP274,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP274.jpg\r
+275,TP275,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP275.jpg\r
+276,TP276,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP276.jpg\r
+277,TP277,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP277.jpg\r
+278,TP278,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP278.jpg\r
+279,TP279,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP279.jpg\r
+280,TP280,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP280.jpg\r
+281,TP281,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP281.jpg\r
+282,TP282,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP282.jpg\r
+283,TP283,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP283.jpg\r
+284,TP284,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP284.jpg\r
+285,TP285,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP285.jpg\r
+286,TP286,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP286.jpg\r
+287,TP287,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP287.jpg\r
+288,TP288,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP288.jpg\r
+289,TP289,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP289.jpg\r
+290,TP290,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP290.jpg\r
+291,TP291,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP291.jpg\r
+292,TP292,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP292.jpg\r
+293,TP293,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP293.jpg\r
+294,TP294,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP294.jpg\r
+295,TP295,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP295.jpg\r
+296,TP296,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP296.jpg\r
+297,TP297,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP297.jpg\r
+298,TP298,Calonarang,1930,"Museum Bali, Denpasar","A fearsome mask representing a witch or demon in the Calonarang drama, a play about magic and exorcism.",-8.657875,115.222384,TP298.jpg\r
+299,TP299,Wanara Monkey,1930,"Private Collection, France","This beautiful image captures the mischievous characters of members of the monkeys in Sugriwa's wanara army. Bright, resourceful and playful, like their king they were also easily distracted from the task on hand. Nonetheless they ultimately fulfilled their oaths to help recapture Sita, the kidnapped wife of Rama, from his arch-nemesis Rawana.",46.227638,2.213749,TP299.jpg\r
+300,TP300,"Wibisana, Younger Brother of Rawana",1930,"Private Collection, France","After his elder brother Rawana, the sorcerer-king of Alengka, kidnaps Princess Sita, Wibisana denounces his actions as cowardly and foolish and asks him to release the innocent wife of Rama. The enraged king banishes Wibisana, who allies himself with Prince Rama and the monkey army, intent on teaching his power-hungry brother a lesson in karmapala.",46.227638,2.213749,TP300.jpg`;
+    </script>
+</body>
+</html>
