@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Peta Sebaran Topeng Bali (Search & Images)</title>
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; overflow: hidden; }
@@ -355,7 +354,6 @@
 </head>
 <body>
 
-    <!-- Bar Pencarian Responsif -->
     <div class="search-container" id="searchBar">
         <div class="search-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -363,7 +361,7 @@
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
         </div>
-        <input type="text" id="searchInput" placeholder="Cari topeng, lokasi, atau tahun..." autocomplete="off" />
+        <input type="text" id="searchInput" placeholder="Cari topeng, lokasi, ID, atau deskripsi..." autocomplete="off" />
         <button class="clear-btn" id="clearBtn" title="Hapus pencarian">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -371,14 +369,11 @@
             </svg>
         </button>
         
-        <!-- Panel Saran Dropdown Pencarian -->
         <div class="search-results-dropdown" id="searchResults"></div>
     </div>
 
-    <!-- Kontainer Peta -->
     <div id="map"></div>
 
-    <!-- Mobile Bottom Drawer -->
     <div class="bottom-drawer" id="mobileDrawer">
         <div class="drawer-handle"></div>
         <div class="drawer-header">
@@ -396,7 +391,6 @@
         <div class="drawer-content" id="drawerContent"></div>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // Inisialisasi peta ke tengah Pulau Bali (zoomControl dimatikan di sini)
@@ -562,9 +556,11 @@
             var matchedMasks = [];
             
             properties.masks.forEach(function(mask) {
-                // Saring otomatis topeng yang cocok dengan kata kunci saja
+                // Saring otomatis topeng yang cocok dengan semua kolom data kunci
                 var matches = !search ||
                     mask.nama.toLowerCase().includes(search) ||
+                    mask.id_topeng.toLowerCase().includes(search) ||
+                    mask.deskripsi.toLowerCase().includes(search) ||
                     properties.lokasi.toLowerCase().includes(search) ||
                     mask.tahun.toString().toLowerCase().includes(search);
                 if (matches) {
@@ -579,6 +575,7 @@
                 var nameDisplay = highlightText(mask.nama, searchTerm);
                 var yearDisplay = highlightText(mask.tahun.toString(), searchTerm);
                 var descDisplay = highlightText(mask.deskripsi, searchTerm);
+                var idDisplay = highlightText(mask.id_topeng, searchTerm);
 
                 // Otomatis buka accordion untuk topeng yang dipilih/aktif saat ini
                 var isExpanded = (mask.id_topeng === activeHighlightId || (searchTerm && !activeHighlightId)) ? 'open' : '';
@@ -595,7 +592,7 @@
                     html += '      <img src="' + imagePath + '" class="mask-img" alt="' + mask.nama + '" onerror="this.onerror=null; this.src=\'https://placehold.co/150x150?text=' + encodeURIComponent(mask.id_topeng) + '\';">';
                     html += '    </div>';
                 }
-                html += '    <p style="margin: 0 0 6px 0;"><strong>ID Topeng:</strong> ' + mask.id_topeng + '</p>';
+                html += '    <p style="margin: 0 0 6px 0;"><strong>ID Topeng:</strong> ' + idDisplay + '</p>';
                 html += '    <p style="margin: 0; text-align: justify;">' + descDisplay + '</p>';
                 html += '  </div>';
                 html += '</details>';
@@ -614,6 +611,8 @@
                 var search = searchTerm ? searchTerm.toLowerCase() : "";
                 return !search ||
                     mask.nama.toLowerCase().includes(search) ||
+                    mask.id_topeng.toLowerCase().includes(search) ||
+                    mask.deskripsi.toLowerCase().includes(search) ||
                     properties.lokasi.toLowerCase().includes(search) ||
                     mask.tahun.toString().toLowerCase().includes(search);
             }).length;
@@ -640,6 +639,8 @@
                 var search = searchTerm ? searchTerm.toLowerCase() : "";
                 return !search ||
                     mask.nama.toLowerCase().includes(search) ||
+                    mask.id_topeng.toLowerCase().includes(search) ||
+                    mask.deskripsi.toLowerCase().includes(search) ||
                     properties.lokasi.toLowerCase().includes(search) ||
                     mask.tahun.toString().toLowerCase().includes(search);
             }).length;
@@ -705,8 +706,10 @@
                     var search = searchTerm.toLowerCase();
                     return props.masks.some(m => 
                         m.nama.toLowerCase().includes(search) || 
+                        m.id_topeng.toLowerCase().includes(search) || 
+                        m.deskripsi.toLowerCase().includes(search) || 
                         props.lokasi.toLowerCase().includes(search) || 
-                        m.tahun.toLowerCase().includes(search)
+                        m.tahun.toString().toLowerCase().includes(search) // Proteksi aman menggunakan .toString()
                     );
                 },
                 onEachFeature: function (feature, layer) {
@@ -772,6 +775,8 @@
                 
                 props.masks.forEach(function(mask) {
                     if (mask.nama.toLowerCase().includes(q) || 
+                        mask.id_topeng.toLowerCase().includes(q) || 
+                        mask.deskripsi.toLowerCase().includes(q) || 
                         props.lokasi.toLowerCase().includes(q) || 
                         mask.tahun.toString().toLowerCase().includes(q)) {
                         matches.push({
