@@ -1,87 +1,190 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peta Sebaran Topeng Bali (Standard Popup)</title>
+    <title>Bali Mask Distribution Map (Search & Images)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        /* ================================================================== */
+        /* CSS SECTION 1: BASIC SETTINGS & MAIN MAP                            */
+        /* ================================================================== */
         body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; overflow: hidden; }
         #map { width: 100%; height: 100vh; z-index: 1; }
         
-        /* Map Title UI */
+        /* Map Title UI - Floating position at top left */
         .map-title-container { position: absolute; top: 20px; left: 20px; z-index: 1100; background: rgba(255, 255, 255, 0.95); padding: 12px 18px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); pointer-events: none; border-left: 5px solid #e74c3c; }
         .map-main-title { margin: 0; font-size: 18px; color: #2c3e50; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .map-sub-title { margin: 4px 0 0 0; font-size: 13px; color: #7f8c8d; }
 
-        /* Search Container */
+        /* ================================================================== */
+        /* CSS SECTION 2: SEARCH INTERFACE (SEARCH BAR)                        */
+        /* ================================================================== */
         .search-container { position: absolute; top: 20px; right: 20px; z-index: 1100; background: white; padding: 6px 14px; border-radius: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); width: 350px; max-width: 100%; display: flex; align-items: center; border: 1px solid #f1f5f9; transition: all 0.3s ease; }
-        .search-input { width: 100%; border: none; padding: 8px 4px; font-size: 15px; outline: none; background: transparent; color: #334155; }
-        .clear-btn { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; border-radius: 50%; display: none; }
-        .search-counter { position: absolute; top: 75px; right: 20px; z-index: 1100; background: #e74c3c; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 10px rgba(231, 76, 60, 0.3); display: none; }
-        .no-result-toast { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: #334155; color: white; padding: 10px 20px; border-radius: 8px; z-index: 1100; display: none; }
-        .highlight { background-color: #fef08a; padding: 0 2px; border-radius: 2px; color: #b45309; }
-
-        /* Popup Customization */
-        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
-        .leaflet-popup-content { margin: 0; width: 280px !important; }
-        .popup-header { background: #e74c3c; color: white; padding: 12px; font-size: 14px; font-weight: bold; }
-        .popup-body { padding: 10px; max-height: 250px; overflow-y: auto; background: white; }
+        .search-container:focus-within { box-shadow: 0 6px 25px rgba(231, 76, 60, 0.2); border-color: #fbd3ce; }
+        .search-icon { color: #e74c3c; margin-right: 10px; display: flex; align-items: center; justify-content: center; }
+        .search-icon svg { width: 20px; height: 20px; } 
+        .search-input { width: 100%; border: none; padding: 8px 4px; font-size: 15px; outline: none; background: transparent; color: #334155; font-family: inherit; }
+        .search-input::placeholder { color: #94a3b8; font-style: italic; }
+        .clear-btn { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; border-radius: 50%; display: none; align-items: center; justify-content: center; transition: background-color 0.2s, color 0.2s; }
+        .clear-btn:hover { background-color: #f1f5f9; color: #e74c3c; }
+        .clear-btn svg { width: 16px; height: 16px; }
         
-        /* Accordion Cards */
-        .mask-item { margin-bottom: 8px; border: 1px dashed #cbd5e1; border-radius: 6px; overflow: hidden; }
-        .mask-summary { padding: 10px; cursor: pointer; font-weight: bold; color: #0f172a; font-size: 13px; }
-        .mask-details { padding: 10px; font-size: 12px; }
-        .mask-image { width: 100%; height: auto; max-height: 150px; object-fit: contain; }
-        .mask-meta { display: block; font-size: 11px; color: #64748b; margin-top: 5px; }
+        .search-counter { position: absolute; top: 75px; right: 20px; z-index: 1100; background: #e74c3c; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 10px rgba(231, 76, 60, 0.3); display: none; white-space: nowrap; }
+        .no-result-toast { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: #334155; color: white; padding: 10px 20px; border-radius: 8px; z-index: 1100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: none; opacity: 0; transition: opacity 0.3s; }
+        .highlight { background-color: #fef08a; padding: 0 2px; border-radius: 2px; font-weight: 600; color: #b45309; }
 
+        /* ================================================================== */
+        /* CSS SECTION 3: DESKTOP POPUP & MOBILE DRAWER (INFORMATION VIEW)    */
+        /* ================================================================== */
+        /* Desktop Popup */
+        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        .leaflet-popup-content { margin: 0; width: 320px !important; }
+        .popup-header { background: #e74c3c; color: white; padding: 15px; font-size: 16px; font-weight: bold; border-bottom: 3px solid #c0392b; }
+        .popup-body { padding: 15px; max-height: 280px; overflow-y: auto; background: white; }
+        
+        /* Mobile Drawer */
+        #mobile-drawer { position: fixed; bottom: -100%; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); z-index: 2000; transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); max-height: 40vh; display: flex; flex-direction: column; }
+        #mobile-drawer.active { bottom: 0; }
+        .drawer-handle-container { width: 100%; padding: 10px 0 5px; display: flex; justify-content: center; cursor: pointer; }
+        .drawer-handle { width: 40px; height: 5px; background: #cbd5e1; border-radius: 3px; }
+        .drawer-header { padding: 10px 20px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
+        .drawer-title { font-size: 18px; font-weight: bold; color: #1e293b; margin: 0; }
+        .drawer-close { background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #64748b; cursor: pointer; }
+        .drawer-body { padding: 15px 20px 20px; overflow-y: auto; flex-grow: 1; }
+        #map-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1500; display: none; opacity: 0; transition: opacity 0.3s; }
+        #map-overlay.active { display: block; opacity: 1; }
+
+        /* ================================================================== */
+        /* CSS SECTION 4: MASK ACCORDION CARD & IMAGE (DETAIL UI)            */
+        /* ================================================================== */
+        .mask-item { margin-bottom: 12px; border: 1px dashed #cbd5e1; border-radius: 8px; overflow: hidden; }
+        .mask-item:last-child { margin-bottom: 0; }
+        .mask-summary { padding: 12px; background: #f8fafc; cursor: pointer; font-weight: bold; color: #0f172a; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+        .mask-summary:hover { background: #f1f5f9; }
+        .mask-summary::marker, .mask-summary::-webkit-details-marker { display: none; }
+        .mask-summary-icon { color: #e74c3c; transition: transform 0.3s; }
+        details[open] .mask-summary-icon { transform: rotate(180deg); }
+        details[open] .mask-summary { background: #fff5f5; border-bottom: 1px dashed #cbd5e1; color: #e74c3c; }
+        .mask-details { padding: 15px; background: white; font-size: 14px; line-height: 1.6; color: #475569; }
+        .mask-meta { display: inline-block; background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-size: 12px; color: #64748b; margin-bottom: 8px; margin-right: 5px; font-weight: 600; }
+        .mask-desc-title { font-weight: bold; color: #334155; margin-top: 10px; margin-bottom: 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;}
+        .mask-desc-content { text-align: justify; margin: 0; }
+        
+        .mask-image-container { width: 100%; border-radius: 6px; overflow: hidden; margin-bottom: 12px; background: #f1f5f9; position: relative; min-height: 150px; display: flex; align-items: center; justify-content: center; }
+        .mask-image { width: 100%; height: auto; display: block; object-fit: contain; max-height: 250px; }
+        .img-fallback { padding: 20px; text-align: center; color: #94a3b8; font-size: 12px; }
+        .img-fallback svg { width: 40px; height: 40px; margin-bottom: 8px; color: #cbd5e1; }
+
+        /* ================================================================== */
+        /* CSS SECTION 5: RESPONSIVE DESIGN (MOBILE)                          */
+        /* ================================================================== */
         @media (max-width: 768px) {
-            .map-title-container { top: 15px; left: 50%; transform: translateX(-50%); width: 85%; text-align: center; }
-            .search-container { width: 90%; top: 70px; left: 50%; right: auto; transform: translateX(-50%); }
-            .search-counter { top: 115px; left: 50%; right: auto; transform: translateX(-50%); } 
+            .map-title-container { top: 15px; left: 50%; transform: translateX(-50%); width: 85%; max-width: 480px; text-align: center; padding: 8px; border-left: none; border-top: 3px solid #e74c3c; }
+            .map-main-title { font-size: 15px; }
+            .map-sub-title { font-size: 11px; }
+            .search-container { width: 90%; top: 85px; left: 50%; right: auto; transform: translateX(-50%); }
+            .search-counter { top: 130px; left: 50%; right: auto; transform: translateX(-50%); } 
+            .leaflet-popup { display: none !important; } /* Hide default popup on mobile */
+            .leaflet-control-zoom { display: none; } /* Hide zoom buttons on mobile */
         }
     </style>
 </head>
 <body>
 
     <div class="map-title-container">
-        <h1 class="map-main-title">Peta Persebaran Topeng Bali</h1>
+        <h1 class="map-main-title">Bali Mask Distribution Map</h1>
     </div>
 
     <div class="search-container" id="searchBox">
-        <input type="text" id="searchInput" class="search-input" placeholder="Cari data..." autocomplete="off">
-        <button id="clearBtn" class="clear-btn">X</button>
+        <div class="search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        </div>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search character, ID, year, or location..." autocomplete="off">
+        <button id="clearBtn" class="clear-btn" title="Clear search">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
     </div>
     
-    <div id="searchCounter" class="search-counter"></div>
-    <div id="noResultToast" class="no-result-toast">Data tidak ditemukan.</div>
+    <div id="searchCounter" class="search-counter">Showing X locations</div>
+    <div id="noResultToast" class="no-result-toast">No matching mask data found.</div>
 
+    <div id="map-overlay"></div>
     <div id="map"></div>
+
+    <div id="mobile-drawer">
+        <div class="drawer-handle-container" id="drawerHandle">
+            <div class="drawer-handle"></div>
+        </div>
+        <div class="drawer-header">
+            <h3 class="drawer-title" id="drawerTitle">Location</h3>
+            <button class="drawer-close" id="drawerClose">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="drawer-body" id="drawerBody">
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // ========================================================================= //
+        // JS SECTION 1: GLOBAL VARIABLES & LEAFLET MAP INITIALIZATION               //
+        // ========================================================================= //
         let allMaskData = []; 
         let markersGroup = L.layerGroup(); 
+        let currentSearchQuery = ""; 
+        let isMobile = window.innerWidth <= 768; 
 
-        const map = L.map('map').setView([-8.409518, 115.188916], 10); 
+        // Basic Map Setting
+        const map = L.map('map', { zoomControl: false }).setView([-8.409518, 115.188916], 10); 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CartoDB</a>',
+            subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
         
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        map.attributionControl.setPrefix('Developed by &copy; <strong>Luh Made Tirta Dewi</strong>');
         markersGroup.addTo(map);
 
+        // Custom Leaflet Marker Icon
         const redIcon = L.icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
         });
 
+        // Detect Screen Size Changes (Responsive Mobile/Desktop)
+        window.addEventListener('resize', () => {
+            const wasMobile = isMobile;
+            isMobile = window.innerWidth <= 768;
+            if (wasMobile !== isMobile) {
+                const drawer = document.getElementById('mobile-drawer');
+                if (!isMobile && drawer.classList.contains('active')) closeDrawer();
+            }
+        });
+
+
+        // ========================================================================= //
+        // JS SECTION 2: UTILITY FUNCTIONS (PROCESSING TOOLS)                        //
+        // ========================================================================= //
+        
+        // Utility 2A: Text Splitter (Sanitization & Search Highlight)
         function highlightText(text, query) {
-            if (!query) return text;
+            if (!query || query.trim() === "") return text;
+            const safeText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;"); // Prevent HTML injection
             const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-            return text.replace(regex, '<span class="highlight">$1</span>');
+            return safeText.replace(regex, '<span class="highlight">$1</span>');
         }
 
+        // Utility 2B: Parse Raw CSV Data to JavaScript Object
         function parseCSV(csv) {
             const lines = csv.split('\n');
             const result = [];
@@ -89,48 +192,99 @@
                 if (!lines[i]) continue;
                 const row = lines[i].match(/(?:\"([^\"]*(?:\"\"[^\"]*)*)\")|([^\,]+)/g);
                 if (row && row.length >= 8) {
-                    const lat = parseFloat(row[6].replace(/^"|"$/g, '').trim());
-                    const lng = parseFloat(row[7].replace(/^"|"$/g, '').trim());
-                    result.push({ 
-                        name: row[2].replace(/^"|"$/g, '').trim(), 
-                        id: row[1].replace(/^"|"$/g, '').trim(), 
-                        year: row[3].replace(/^"|"$/g, '').trim(), 
-                        location: row[4].replace(/^"|"$/g, '').trim(), 
-                        desc: row[5].replace(/^"|"$/g, '').trim(), 
-                        lat, lng, 
-                        photo: (row.length > 8) ? row[8].replace(/^"|"$/g, '').trim() : '' 
-                    });
+                    const no = row[0] ? row[0].replace(/^"|"$/g, '').trim() : '';
+                    const id = row[1] ? row[1].replace(/^"|"$/g, '').trim() : '';
+                    const name = row[2] ? row[2].replace(/^"|"$/g, '').trim() : '';
+                    const year = row[3] ? row[3].replace(/^"|"$/g, '').trim() : '';
+                    const location = row[4] ? row[4].replace(/^"|"$/g, '').trim() : '';
+                    const fullAddress = row[5] ? row[5].replace(/^"|"$/g, '').trim() : '';
+                    const desc = row[6] ? row[6].replace(/^"|"$/g, '').trim() : '';
+                    const lat = parseFloat(row[7] ? row[7].replace(/^"|"$/g, '').trim() : 0);
+                    const lng = parseFloat(row[8] ? row[8].replace(/^"|"$/g, '').trim() : 0);
+                    const photo = (row.length > 9 && row[9]) ? row[9].replace(/^"|"$/g, '').trim() : '';
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        result.push({ no, id, name, year, location, fullAddress, desc, lat, lng, photo });
+                    }
                 }
             }
             return result;
         }
 
+        // Utility 2C: Group Mask Data If Coordinates Are the Same
         function groupDataByLocation(data) {
             const grouped = {};
             data.forEach(item => {
                 const key = `${item.lat}_${item.lng}`;
-                if (!grouped[key]) grouped[key] = { lat: item.lat, lng: item.lng, locationName: item.location, items: [] };
+                if (!grouped[key]) {
+                    grouped[key] = { lat: item.lat, lng: item.lng, locationName: item.location, fullAddress: item.fullAddress, items: [] };
+                }
                 grouped[key].items.push(item);
             });
             return grouped;
         }
 
+
+        // ========================================================================= //
+        // JS SECTION 3: INTERFACE CONSTRUCTION LOGIC (HTML RENDERER)                //
+        // ========================================================================= //
+        
+        // Logic 3A: Build Popup/Drawer Content for each Mask
         function generateHTMLContent(locationData, query = "") {
-            let html = `<div class="popup-header">${locationData.locationName}</div><div class="popup-body">`;
+            const itemCount = locationData.items.length;
+            const title = locationData.locationName;
+            const address = locationData.fullAddress;
+            
+            let html = `<div class="popup-header">
+                            <div>${title}</div>
+                            <div style="font-size: 12px; font-weight: normal; margin-top: 2px;">${address}</div>
+                            <div style="font-size: 11px; font-weight: normal; margin-top: 4px; opacity: 0.8;">${itemCount} mask collection(s) found</div>
+                        </div>
+                        <div class="popup-body">`;
+            
             locationData.items.forEach(item => {
+                const highlightedName = highlightText(item.name, query);
+                const highlightedId = highlightText(item.id, query);
+                const highlightedYear = highlightText(item.year, query);
+                const highlightedDesc = highlightText(item.desc, query);
+                
+                // Prepare image and fallback mechanism if photo is missing/broken
+                let imageElement = '';
+                if (item.photo && item.photo.trim() !== '') {
+                    imageElement = `<img src="images/${item.photo}" class="mask-image" alt="Mask Photo ${item.name}" onerror="this.parentElement.innerHTML='<div class=\\'img-fallback\\'><svg fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'2\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\\'/></svg><br>Photo not available</div>'">`;
+                } else {
+                    imageElement = `<div class="img-fallback">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><br>No documentation photo yet
+                    </div>`;
+                }
+
                 html += `
                 <details class="mask-item">
-                    <summary class="mask-summary">${highlightText(item.name, query)}</summary>
+                    <summary class="mask-summary">
+                        <span>${highlightedName}</span>
+                        <svg class="mask-summary-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </summary>
                     <div class="mask-details">
-                        <span class="mask-meta">ID: ${item.id} | Tahun: ${item.year}</span>
-                        <p>${highlightText(item.desc, query)}</p>
+                        <div class="mask-image-container">
+                            ${imageElement}
+                        </div>
+                        <div> 
+                            <span class="mask-meta">ID: ${highlightedId}</span>
+                            <span class="mask-meta">Year: ${highlightedYear}</span>
+                        </div>
+                        <div class="mask-desc-title">Historical Narrative:</div>
+                        <p class="mask-desc-content">${highlightedDesc}</p>
                     </div>
                 </details>`;
             });
+            
             html += `</div>`;
             return html;
         }
 
+        // Logic 3B: Place Markers on the Map
         function renderMap(data, query = "") {
             markersGroup.clearLayers();
             const groupedData = groupDataByLocation(data);
@@ -141,53 +295,159 @@
                 markerCount++;
                 const marker = L.marker([loc.lat, loc.lng], { icon: redIcon });
                 
-                // POPUP STANDAR: Selalu digunakan baik di HP maupun Desktop
-                marker.bindPopup(generateHTMLContent(loc, query), { maxWidth: 300 });
+                // When marker is clicked
+                marker.on('click', function(e) {
+                    if (isMobile) {
+                        openDrawer(loc, query); // Open Drawer on Mobile
+                    } else {
+                        const htmlContent = generateHTMLContent(loc, query);
+                        const popup = L.popup({
+                            maxWidth: 320, minWidth: 320, className: 'custom-popup',
+                            autoPanPaddingTopLeft: L.point(10, 100), 
+                        })
+                        .setLatLng([loc.lat, loc.lng])
+                        .setContent(htmlContent)
+                        .openOn(map); // Open Popup on Desktop
+                    } 
+                    const offsetLat = isMobile ? loc.lat - 0.05 : loc.lat + 0.01;
+                    map.flyTo([offsetLat, loc.lng], 13, { animate: true, duration: 0.8 });
+                });
                 markersGroup.addLayer(marker);
             }
 
-            // Update UI Pencarian
+            // Update search result counter
             const counterEl = document.getElementById('searchCounter');
+            const toastEl = document.getElementById('noResultToast');
+            
             if (query !== "") {
-                counterEl.textContent = `Hasil: ${markerCount} lokasi`;
-                counterEl.style.display = 'block';
+                if (markerCount > 0) {
+                    counterEl.textContent = `Found ${markerCount} location(s)`;
+                    counterEl.style.display = 'block';
+                    toastEl.style.opacity = '0';
+                    setTimeout(() => { toastEl.style.display = 'none'; }, 300);
+                    
+                    if (markerCount > 1) {
+                        const bounds = [];
+                        for(let key in groupedData) bounds.push([groupedData[key].lat, groupedData[key].lng]);
+                        map.flyToBounds(bounds, { padding: [50, 50], duration: 1 });
+                    } else if (markerCount === 1) {
+                        const singleLoc = groupedData[Object.keys(groupedData)[0]];
+                        map.flyTo([singleLoc.lat, singleLoc.lng], 12, { duration: 1 });
+                    }
+                } else {
+                    counterEl.style.display = 'none';
+                    toastEl.style.display = 'block';
+                    setTimeout(() => { toastEl.style.opacity = '1'; }, 10);
+                }
             } else {
                 counterEl.style.display = 'none';
+                toastEl.style.opacity = '0';
+                setTimeout(() => { toastEl.style.display = 'none'; }, 300);
             }
         }
 
+
+        // ========================================================================= //
+        // JS SECTION 4: USER INTERACTION (DRAWER & SEARCH FEATURES)                  //
+        // ========================================================================= //
+        
+        // Interaction 4A: Mobile Drawer Toggle Control
+        const drawer = document.getElementById('mobile-drawer');
+        const overlay = document.getElementById('map-overlay');
+        const drawerTitle = document.getElementById('drawerTitle');
+        const drawerBody = document.getElementById('drawerBody');
+        const drawerClose = document.getElementById('drawerClose');
+        const drawerHandle = document.getElementById('drawerHandle');
+
+        function openDrawer(locationData, query) {
+            drawerTitle.textContent = locationData.locationName;
+            let rawContent = generateHTMLContent(locationData, query);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(rawContent, 'text/html');
+            const bodyContent = doc.querySelector('.popup-body').innerHTML;
+            
+            drawerBody.innerHTML = bodyContent;
+            overlay.classList.add('active');
+            drawer.classList.add('active');
+        }
+
+        function closeDrawer() {
+            drawer.classList.remove('active');
+            overlay.classList.remove('active');
+            map.setZoom(11);
+        }
+
+        drawerClose.addEventListener('click', closeDrawer);
+        overlay.addEventListener('click', closeDrawer);
+        drawerHandle.addEventListener('click', closeDrawer);
+
+        // Interaction 4B: Real-Time Search System
         const searchInput = document.getElementById('searchInput');
         const clearBtn = document.getElementById('clearBtn');
 
         searchInput.addEventListener('input', function(e) {
             const query = e.target.value.toLowerCase().trim();
-            if (query.length > 0) clearBtn.style.display = 'block';
-            else clearBtn.style.display = 'none';
+            currentSearchQuery = query;
             
-            const filteredData = allMaskData.filter(item => 
-                item.name.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query)
-            );
-            renderMap(filteredData, query);
+            if (query.length > 0) {
+                clearBtn.style.display = 'flex';
+                const filteredData = allMaskData.filter(item => 
+                    item.name.toLowerCase().includes(query) ||
+                    item.id.toLowerCase().includes(query) ||
+                    item.year.toLowerCase().includes(query) ||
+                    item.location.toLowerCase().includes(query) ||
+                    item.desc.toLowerCase().includes(query)
+                );
+                renderMap(filteredData, query);
+                
+                if (isMobile) closeDrawer();
+                else map.closePopup();
+            } else {
+                clearBtn.style.display = 'none';
+                renderMap(allMaskData, ""); 
+                map.flyTo([-8.409518, 115.188916], 10, { duration: 1 });
+            }
         });
 
-        clearBtn.addEventListener('click', () => {
+        clearBtn.addEventListener('click', function() {
             searchInput.value = "";
+            searchInput.focus();
             clearBtn.style.display = 'none';
+            currentSearchQuery = "";
             renderMap(allMaskData, "");
+            map.flyTo([-8.409518, 115.188916], 10, { duration: 1 });
+            if (isMobile) closeDrawer();
+            else map.closePopup();
         });
+
+
+        // ========================================================================= //
+        // JS SECTION 5: EXTERNAL DATA FETCHING (CSV FETCH API)                       //
+        // ========================================================================= //
+        
+        function processCSVData(csvText) {
+            allMaskData = parseCSV(csvText);
+            console.log(`Successfully loaded ${allMaskData.length} mask data entries.`);
+            renderMap(allMaskData, ""); 
+        }
 
         async function loadData() {
             try {
                 const response = await fetch('Data Topeng.csv');
                 if (response.ok) {
                     const csvText = await response.text();
-                    allMaskData = parseCSV(csvText);
-                    renderMap(allMaskData, ""); 
+                    processCSVData(csvText);
+                } else {
+                    console.error("Data Topeng.csv file not found on server.");
                 }
-            } catch (err) { console.error("Error loading CSV"); }
+            } catch (err) {
+                console.error("Failed to load CSV database. Make sure you are running the system via a Local Server or Hosting.", err);
+            }
         }
 
-        window.onload = loadData;
+        window.onload = function() {
+            loadData();
+        };
 
     </script>
 </body>
