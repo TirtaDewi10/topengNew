@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bali Mask Distribution Map</title>
+    <title>Bali Mask Distribution Map (Search & Images)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* ================================================================== */
@@ -176,37 +176,45 @@
         // JS SECTION 2: UTILITY FUNCTIONS (PROCESSING TOOLS)                        //
         // ========================================================================= //
         
+        // Utility 2A: Text Splitter (Sanitization & Search Highlight)
         function highlightText(text, query) {
             if (!query || query.trim() === "") return text;
-            const safeText = String(text).replace(/</g, "&lt;").replace(/>/g, "&gt;"); 
+            const safeText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;"); // Prevent HTML injection
             const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
             return safeText.replace(regex, '<span class="highlight">$1</span>');
         }
 
-        // IMPROVED: Robust CSV Parser for various environments
+        // Utility 2B: Parse Raw CSV Data to JavaScript Object
         function parseCSV(csv) {
-            const lines = csv.split(/\r?\n/);
+            const lines = csv.split('\n');
             const result = [];
             for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
-                // Regex handles commas in quotes
-                const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                if (!lines[i]) continue;
+                const row = lines[i].match(/(?:\"([^\"]*(?:\"\"[^\"]*)*)\")|([^\,]+)/g);
                 if (row && row.length >= 8) {
-                    const clean = row.map(c => c.replace(/^"|"$/g, '').trim());
-                    result.push({ 
-                        no: clean[0], id: clean[1], name: clean[2], year: clean[3], 
-                        location: clean[4], fullAddress: clean[5], desc: clean[6], 
-                        lat: parseFloat(clean[7]), lng: parseFloat(clean[8]), photo: clean[9] || '' 
-                    });
+                    const no = row[0] ? row[0].replace(/^"|"$/g, '').trim() : '';
+                    const id = row[1] ? row[1].replace(/^"|"$/g, '').trim() : '';
+                    const name = row[2] ? row[2].replace(/^"|"$/g, '').trim() : '';
+                    const year = row[3] ? row[3].replace(/^"|"$/g, '').trim() : '';
+                    const location = row[4] ? row[4].replace(/^"|"$/g, '').trim() : '';
+                    const fullAddress = row[5] ? row[5].replace(/^"|"$/g, '').trim() : '';
+                    const desc = row[6] ? row[6].replace(/^"|"$/g, '').trim() : '';
+                    const lat = parseFloat(row[7] ? row[7].replace(/^"|"$/g, '').trim() : 0);
+                    const lng = parseFloat(row[8] ? row[8].replace(/^"|"$/g, '').trim() : 0);
+                    const photo = (row.length > 9 && row[9]) ? row[9].replace(/^"|"$/g, '').trim() : '';
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        result.push({ no, id, name, year, location, fullAddress, desc, lat, lng, photo });
+                    }
                 }
             }
             return result;
         }
 
+        // Utility 2C: Group Mask Data If Coordinates Are the Same
         function groupDataByLocation(data) {
             const grouped = {};
             data.forEach(item => {
-                if (isNaN(item.lat)) return;
                 const key = `${item.lat}_${item.lng}`;
                 if (!grouped[key]) {
                     grouped[key] = { lat: item.lat, lng: item.lng, locationName: item.location, fullAddress: item.fullAddress, items: [] };
@@ -216,77 +224,231 @@
             return grouped;
         }
 
+
         // ========================================================================= //
         // JS SECTION 3: INTERFACE CONSTRUCTION LOGIC (HTML RENDERER)                //
         // ========================================================================= //
         
+        // Logic 3A: Build Popup/Drawer Content for each Mask
         function generateHTMLContent(locationData, query = "") {
             const itemCount = locationData.items.length;
+            const title = locationData.locationName;
+            const address = locationData.fullAddress;
+            
             let html = `<div class="popup-header">
-                            <div>${locationData.locationName}</div>
-                            <div style="font-size: 12px; font-weight: normal; margin-top: 2px;">Full Address: ${locationData.fullAddress}</div>
+                            <div>${title}</div>
+                            <div style="font-size: 12px; font-weight: normal; margin-top: 2px;">${address}</div>
+                            <div style="font-size: 11px; font-weight: normal; margin-top: 4px; opacity: 0.8;">${itemCount} mask collection(s) found</div>
                         </div>
                         <div class="popup-body">`;
             
             locationData.items.forEach(item => {
+                const highlightedName = highlightText(item.name, query);
+                const highlightedId = highlightText(item.id, query);
+                const highlightedYear = highlightText(item.year, query);
+                const highlightedDesc = highlightText(item.desc, query);
+                
+                // Prepare image and fallback mechanism if photo is missing/broken
+                let imageElement = '';
+                if (item.photo && item.photo.trim() !== '') {
+                    imageElement = `<img src="images/${item.photo}" class="mask-image" alt="Mask Photo ${item.name}" onerror="this.parentElement.innerHTML='<div class=\\'img-fallback\\'><svg fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'2\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\\'/></svg><br>Photo not available</div>'">`;
+                } else {
+                    imageElement = `<div class="img-fallback">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><br>No documentation photo yet
+                    </div>`;
+                }
+
                 html += `
                 <details class="mask-item">
                     <summary class="mask-summary">
-                        <span>${highlightText(item.name, query)}</span>
+                        <span>${highlightedName}</span>
                         <svg class="mask-summary-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
                         </svg>
                     </summary>
                     <div class="mask-details">
                         <div class="mask-image-container">
-                            <img src="images/${item.photo}" class="mask-image" onerror="this.parentElement.innerHTML='<div class=\\'img-fallback\\'>Photo not available</div>'">
+                            ${imageElement}
                         </div>
-                        <div> <span class="mask-meta">ID: ${item.id}</span> <span class="mask-meta">Year: ${item.year}</span></div>
+                        <div> 
+                            <span class="mask-meta">ID: ${highlightedId}</span>
+                            <span class="mask-meta">Year: ${highlightedYear}</span>
+                        </div>
                         <div class="mask-desc-title">Historical Narrative:</div>
-                        <p class="mask-desc-content">${highlightText(item.desc, query)}</p>
+                        <p class="mask-desc-content">${highlightedDesc}</p>
                     </div>
                 </details>`;
             });
-            return html + `</div>`;
+            
+            html += `</div>`;
+            return html;
         }
 
+        // Logic 3B: Place Markers on the Map
         function renderMap(data, query = "") {
             markersGroup.clearLayers();
             const groupedData = groupDataByLocation(data);
+            let markerCount = 0;
+
             for (const key in groupedData) {
                 const loc = groupedData[key];
+                markerCount++;
                 const marker = L.marker([loc.lat, loc.lng], { icon: redIcon });
-                marker.on('click', () => {
-                    if (isMobile) openDrawer(loc, query);
-                    else L.popup({maxWidth: 320}).setLatLng([loc.lat, loc.lng]).setContent(generateHTMLContent(loc, query)).openOn(map);
-                    map.flyTo(isMobile ? [loc.lat-0.05, loc.lng] : [loc.lat+0.01, loc.lng], 13);
+                
+                // When marker is clicked
+                marker.on('click', function(e) {
+                    if (isMobile) {
+                        openDrawer(loc, query); // Open Drawer on Mobile
+                    } else {
+                        const htmlContent = generateHTMLContent(loc, query);
+                        const popup = L.popup({
+                            maxWidth: 320, minWidth: 320, className: 'custom-popup',
+                            autoPanPaddingTopLeft: L.point(10, 100), 
+                        })
+                        .setLatLng([loc.lat, loc.lng])
+                        .setContent(htmlContent)
+                        .openOn(map); // Open Popup on Desktop
+                    } 
+                    const offsetLat = isMobile ? loc.lat - 0.05 : loc.lat + 0.01;
+                    map.flyTo([offsetLat, loc.lng], 13, { animate: true, duration: 0.8 });
                 });
                 markersGroup.addLayer(marker);
             }
+
+            // Update search result counter
+            const counterEl = document.getElementById('searchCounter');
+            const toastEl = document.getElementById('noResultToast');
+            
+            if (query !== "") {
+                if (markerCount > 0) {
+                    counterEl.textContent = `Found ${markerCount} location(s)`;
+                    counterEl.style.display = 'block';
+                    toastEl.style.opacity = '0';
+                    setTimeout(() => { toastEl.style.display = 'none'; }, 300);
+                    
+                    if (markerCount > 1) {
+                        const bounds = [];
+                        for(let key in groupedData) bounds.push([groupedData[key].lat, groupedData[key].lng]);
+                        map.flyToBounds(bounds, { padding: [50, 50], duration: 1 });
+                    } else if (markerCount === 1) {
+                        const singleLoc = groupedData[Object.keys(groupedData)[0]];
+                        map.flyTo([singleLoc.lat, singleLoc.lng], 12, { duration: 1 });
+                    }
+                } else {
+                    counterEl.style.display = 'none';
+                    toastEl.style.display = 'block';
+                    setTimeout(() => { toastEl.style.opacity = '1'; }, 10);
+                }
+            } else {
+                counterEl.style.display = 'none';
+                toastEl.style.opacity = '0';
+                setTimeout(() => { toastEl.style.display = 'none'; }, 300);
+            }
         }
 
+
         // ========================================================================= //
-        // JS SECTION 4: INITIALIZATION                                              //
+        // JS SECTION 4: USER INTERACTION (DRAWER & SEARCH FEATURES)                  //
         // ========================================================================= //
+        
+        // Interaction 4A: Mobile Drawer Toggle Control
+        const drawer = document.getElementById('mobile-drawer');
+        const overlay = document.getElementById('map-overlay');
+        const drawerTitle = document.getElementById('drawerTitle');
+        const drawerBody = document.getElementById('drawerBody');
+        const drawerClose = document.getElementById('drawerClose');
+        const drawerHandle = document.getElementById('drawerHandle');
+
+        function openDrawer(locationData, query) {
+            drawerTitle.textContent = locationData.locationName;
+            let rawContent = generateHTMLContent(locationData, query);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(rawContent, 'text/html');
+            const bodyContent = doc.querySelector('.popup-body').innerHTML;
+            
+            drawerBody.innerHTML = bodyContent;
+            overlay.classList.add('active');
+            drawer.classList.add('active');
+        }
+
+        function closeDrawer() {
+            drawer.classList.remove('active');
+            overlay.classList.remove('active');
+            map.setZoom(11);
+        }
+
+        drawerClose.addEventListener('click', closeDrawer);
+        overlay.addEventListener('click', closeDrawer);
+        drawerHandle.addEventListener('click', closeDrawer);
+
+        // Interaction 4B: Real-Time Search System
+        const searchInput = document.getElementById('searchInput');
+        const clearBtn = document.getElementById('clearBtn');
+
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase().trim();
+            currentSearchQuery = query;
+            
+            if (query.length > 0) {
+                clearBtn.style.display = 'flex';
+                const filteredData = allMaskData.filter(item => 
+                    item.name.toLowerCase().includes(query) ||
+                    item.id.toLowerCase().includes(query) ||
+                    item.year.toLowerCase().includes(query) ||
+                    item.location.toLowerCase().includes(query) ||
+                    item.desc.toLowerCase().includes(query)
+                );
+                renderMap(filteredData, query);
+                
+                if (isMobile) closeDrawer();
+                else map.closePopup();
+            } else {
+                clearBtn.style.display = 'none';
+                renderMap(allMaskData, ""); 
+                map.flyTo([-8.409518, 115.188916], 10, { duration: 1 });
+            }
+        });
+
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = "";
+            searchInput.focus();
+            clearBtn.style.display = 'none';
+            currentSearchQuery = "";
+            renderMap(allMaskData, "");
+            map.flyTo([-8.409518, 115.188916], 10, { duration: 1 });
+            if (isMobile) closeDrawer();
+            else map.closePopup();
+        });
+
+
+        // ========================================================================= //
+        // JS SECTION 5: EXTERNAL DATA FETCHING (CSV FETCH API)                       //
+        // ========================================================================= //
+        
+        function processCSVData(csvText) {
+            allMaskData = parseCSV(csvText);
+            console.log(`Successfully loaded ${allMaskData.length} mask data entries.`);
+            renderMap(allMaskData, ""); 
+        }
+
         async function loadData() {
             try {
                 const response = await fetch('Data Topeng.csv');
-                if (!response.ok) throw new Error("CSV not found");
-                const text = await response.text();
-                allMaskData = parseCSV(text);
-                console.log("Data loaded:", allMaskData);
-                renderMap(allMaskData);
-            } catch (err) { console.error("Error loading CSV:", err); }
+                if (response.ok) {
+                    const csvText = await response.text();
+                    processCSVData(csvText);
+                } else {
+                    console.error("Data Topeng.csv file not found on server.");
+                }
+            } catch (err) {
+                console.error("Failed to load CSV database. Make sure you are running the system via a Local Server or Hosting.", err);
+            }
         }
 
-        window.onload = loadData;
+        window.onload = function() {
+            loadData();
+        };
 
-        // Search logic remains the same...
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            const q = e.target.value.toLowerCase();
-            const filtered = allMaskData.filter(i => i.name.toLowerCase().includes(q) || i.location.toLowerCase().includes(q));
-            renderMap(filtered, q);
-        });
     </script>
 </body>
 </html>
