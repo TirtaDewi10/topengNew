@@ -244,7 +244,7 @@
             
             locationData.items.forEach(item => {
                 const highlightedName = highlightText(item.name, query);
-                const highlightedId = highlightText(item.id, query);
+                // const highlightedId = highlightText(item.id, query);
                 const highlightedYear = highlightText(item.year, query);
                 const highlightedDesc = highlightText(item.desc, query);
                 
@@ -271,7 +271,6 @@
                             ${imageElement}
                         </div>
                         <div> 
-                            <span class="mask-meta">ID: ${highlightedId}</span>
                             <span class="mask-meta">Year: ${highlightedYear}</span>
                         </div>
                         <div class="mask-desc-title">Historical Narrative:</div>
